@@ -1,6 +1,6 @@
 #pragma once
 #include"../view/MainView.hpp"
-#include"CanvasViewController.hpp"
+#include"CanvasController.hpp"
 namespace Kim {
     class KMainViewController{
     private:

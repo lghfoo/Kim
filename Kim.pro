@@ -24,7 +24,9 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     controller/ApplicationController.hpp \
-    controller/CanvasViewController.hpp \
+    controller/CanvasController.hpp \
+    controller/ConnectionController.hpp \
+    controller/ItemController.hpp \
     controller/MainViewController.hpp \
     view/CanvasView.hpp \
     view/ConnectionView.hpp \
