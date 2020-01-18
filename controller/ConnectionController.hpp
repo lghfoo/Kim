@@ -33,7 +33,12 @@ namespace Kim {
         }
         void SetSrcItemController(KItemController* ItemController){
             SrcItemController = ItemController;
-            UpdateSrcPosition(SrcItemController->GetView()->GetCenterPos());
+            auto CenterPos = SrcItemController->GetView()->GetCenterPos();
+            UpdateSrcPosition(CenterPos);
+            // 在没有Dst时，起始位置和结束位置相同
+            if(!DstItemController){
+                UpdateDstPosition(CenterPos);
+            }
             QObject::connect(
                         ItemController,
                         &KItemController::PosChangedSignal,
