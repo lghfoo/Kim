@@ -1,8 +1,10 @@
 #pragma once
 #include<QGraphicsItem>
 #include <QPainter>
+#include<QGraphicsSceneDragDropEvent>
 namespace Kim {
-    class KConnectionView : public QGraphicsItem{
+    class KConnectionView : public QObject, public QGraphicsItem{
+        Q_OBJECT
     public:
         enum EShapeType{Line, Quad, Cubic};
     private:
@@ -11,15 +13,23 @@ namespace Kim {
         QPointF CtrlFrom;
         QPointF CtrlTo;
         QPointF To;
-    public:
-        void SetFrom(const QPointF& From){
+    public slots:
+        void UpdateFrom(const QPointF& From){
             this->From = From;
             this->update();
         }
-        void SetTo(const QPointF& To){
+        void UpdateTo(const QPointF& To){
             this->To = To;
             this->update();
         }
+    public:
+        KConnectionView(){
+            this->setZValue(-1);
+        }
+        QPointF GetFrom(){return From;}
+        QPointF GetTo(){return To;}
+        QPointF GetCtrlFrom(){return CtrlFrom;}
+        QPointF GetCtrlTo(){return CtrlTo;}
         void SetShapeType(EShapeType ShapeType){
             switch (ShapeType) {
             case EShapeType::Line:
@@ -58,6 +68,5 @@ namespace Kim {
             }
             painter->drawPath(Path);
         }
-
     };
 }

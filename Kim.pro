@@ -23,6 +23,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
+    common/DragDropProtocol.hpp \
     controller/ApplicationController.hpp \
     controller/CanvasController.hpp \
     controller/ConnectionController.hpp \

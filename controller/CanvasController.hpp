@@ -26,6 +26,33 @@ namespace Kim {
                 break;
             }
         }
+
+        void OnStartConnecting(KItemController* ItemController){
+            if(SceneContext.DragingConnectionController)return;
+            KConnectionController* Controller = new KConnectionController;
+            Controller->SetSrcItemController(ItemController);
+            Scene->addItem(Controller->GetConnectionView());
+            SceneContext.DragingConnectionController = Controller;
+        }
+
+        void OnEndConnecting(KItemController* ItemController){
+            if(SceneContext.DragingConnectionController){
+                if(ItemController){
+                    SceneContext.DragingConnectionController->SetDstItemController(ItemController);
+                    SceneContext.DragingConnectionController = nullptr;
+                }
+            }
+        }
+
+        void OnItemIgnoreDrop(KItemController* ItemController){
+            printf("ignore drop\n");
+            if(SceneContext.DragingConnectionController){
+//                Scene->removeItem(SceneContext.DragingConnectionController->GetConnectionView());
+                delete SceneContext.DragingConnectionController;
+                SceneContext.DragingConnectionController = nullptr;
+                Scene->update();
+            }
+        }
     public:
         KCanvasController(){
             CanvasView->setScene(Scene);
@@ -33,6 +60,9 @@ namespace Kim {
                              this, &KCanvasController::OnKeyRelease);
             QObject::connect(Scene, &KScene::DragMoveSignal,
                              this, &KCanvasController::OnDragMove);
+            QObject::connect(Scene, &KScene::MouseReleaseSignal,
+                             this, &KCanvasController::OnMouseRelease);
+
         }
 
         KCanvasView* GetCanvasView(){
@@ -43,11 +73,15 @@ namespace Kim {
             AddTextItem();
         }
 
-        void OnStartDragDrop(KItemController* View){
-            KConnectionController* Controller = new KConnectionController;
-            Controller->SetSrcItemController(View);
-            Scene->addItem(Controller->GetConnectionView());
-            SceneContext.DragingConnectionController = Controller;
+        void OnMouseRelease(QGraphicsSceneMouseEvent *mouseEvent){
+//            if(SceneContext.DragingConnectionController){
+//                auto Controller = CreateTextItem();
+//                SceneContext.DragingConnectionController->SetDstItemController(Controller);
+//                AddItemAt(Controller->GetView()->GetGraphics(),
+//                          SceneContext.DragingConnectionController->GetConnectionView()->GetTo());
+//                ItemViewControlleres.append(Controller);
+//                SceneContext.DragingConnectionController = nullptr;
+//            }
         }
 
         void OnDragMove(QGraphicsSceneDragDropEvent* event){
@@ -58,11 +92,35 @@ namespace Kim {
         }
 
         void AddTextItem(){
-            KTextItemController* Controller = new KTextItemController;
-            connect(Controller, &KItemController::StartDragDropSignal,
-                    this, &KCanvasController::OnStartDragDrop);
+            auto Controller = CreateTextItem();
             Scene->addItem(Controller->GetView()->GetGraphics());
             ItemViewControlleres.append(Controller);
+        }
+
+        KTextItemController* CreateTextItem(){
+            KTextItemController* Controller = new KTextItemController;
+            connect(Controller, &KItemController::StartConnectingSignal,
+                    this, &KCanvasController::OnStartConnecting);
+            connect(Controller, &KItemController::EndConnectingSignal,
+                    this, &KCanvasController::OnEndConnecting);
+            connect(Controller, &KItemController::PosChangedSignal,
+                    this, [=]{Scene->update();});
+            connect(Controller, &KItemController::IgnoreDropSignal,
+                    [=](KItemController* Controller){
+                printf("ignore drop\n");
+                if(SceneContext.DragingConnectionController){
+    //                Scene->removeItem(SceneContext.DragingConnectionController->GetConnectionView());
+                    delete SceneContext.DragingConnectionController;
+                    SceneContext.DragingConnectionController = nullptr;
+                    Scene->update();
+                }
+            });
+            return Controller;
+        }
+
+        void AddItemAt(QGraphicsItem* Item, const QPointF& Pos){
+            Item->setPos(Pos);
+            Scene->addItem(Item);
         }
     };
 }

@@ -4,10 +4,22 @@ namespace Kim {
     class KItemController : public QObject{
         Q_OBJECT
     signals:
-        void StartDragDropSignal(KItemController* View);
+        void StartConnectingSignal(KItemController* Controller);
+        void EndConnectingSignal(KItemController* Controller);
+        void IgnoreDropSignal(KItemController* Controller);
+        void PosChangedSignal(const QPointF& NewPow);
     public slots:
-        void EmitStartDragDropSignal(){
-            emit StartDragDropSignal(this);
+        void EmitStartConnectingSignal(){
+            emit StartConnectingSignal(this);
+        }
+        void EmitEndConnectingSignal(){
+            emit EndConnectingSignal(this);
+        }
+        void EmitPosChangeSignal(){
+            emit PosChangedSignal(ItemView->GetCenterPos());
+        }
+        void EmitIgnoreDropSignal(){
+            emit IgnoreDropSignal(this);
         }
     protected:
         KItemView* ItemView = nullptr;
@@ -16,7 +28,19 @@ namespace Kim {
             connect(ItemView,
                     &KItemView::StartDragDropSignal,
                     this,
-                    &KItemController::EmitStartDragDropSignal);
+                    &KItemController::EmitStartConnectingSignal);
+            connect(ItemView,
+                    &KItemView::EndDragDropSignal,
+                    this,
+                    &KItemController::EmitEndConnectingSignal);
+            connect(ItemView,
+                    &KItemView::PosChangedSignal,
+                    this,
+                    &KItemController::EmitPosChangeSignal);
+            connect(ItemView,
+                    &KItemView::IgnoreDropSignal,
+                    this,
+                    &KItemController::EmitIgnoreDropSignal);
         }
         KItemView* GetView() {
             return ItemView;

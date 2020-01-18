@@ -2,15 +2,26 @@
 #include<QGraphicsView>
 #include<QGraphicsScene>
 #include<QKeyEvent>
+#include<QTimer>
+#include<QDebug>
+#include<QGraphicsSceneDragDropEvent>
 namespace Kim {
     class KScene : public QGraphicsScene{
         Q_OBJECT
     signals:
-        void DragMoveSignal(QGraphicsSceneDragDropEvent* event);
-    protected:
+        void DragMoveSignal(QGraphicsSceneDragDropEvent *mouseEvent);
+        void MouseReleaseSignal(QGraphicsSceneMouseEvent *mouseEvent);
+    public:
         virtual void dragMoveEvent(QGraphicsSceneDragDropEvent *event)override{
             emit DragMoveSignal(event);
             QGraphicsScene::dragMoveEvent(event);
+        }
+
+        virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *mouseEvent)override{
+            QGraphicsScene::mouseReleaseEvent(mouseEvent);
+            if(!mouseEvent->isAccepted()){
+                emit MouseReleaseSignal(mouseEvent);
+            }
         }
 
     };
@@ -26,6 +37,7 @@ namespace Kim {
         virtual void keyReleaseEvent(QKeyEvent *event) override{
             emit KeyReleaseSignal(event);
         }
+
     };
 
 
