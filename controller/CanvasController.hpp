@@ -24,6 +24,11 @@ namespace Kim {
              * AtNearest: 在最近处添加Item
              */
             enum KAddPosType{AtMouse, AtCursor, AtNearest, AddPosCount};
+            /**
+             * @brief WriteDirectly
+             * 对文本节点输入时直接覆盖文本
+             */
+            bool WriteDirectly;
             KMoveTargetType MoveTargetType = MoveCursor;
             KAddPosType AddPosType = AtCursor;
             void ToNextMoveTargetType(){

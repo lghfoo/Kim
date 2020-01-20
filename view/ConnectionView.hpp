@@ -15,10 +15,12 @@ namespace Kim {
         QPointF To;
     public slots:
         void UpdateFrom(const QPointF& From){
+            this->prepareGeometryChange();
             this->From = From;
             this->update();
         }
         void UpdateTo(const QPointF& To){
+            this->prepareGeometryChange();
             this->To = To;
             this->update();
         }

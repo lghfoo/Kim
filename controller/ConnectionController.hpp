@@ -47,7 +47,7 @@ namespace Kim {
         }
         void SetDstItemController(KItemController* ItemController){
             DstItemController = ItemController;
-            UpdateDstPosition(SrcItemController->GetView()->GetCenterPos());
+            UpdateDstPosition(DstItemController->GetView()->GetCenterPos());
             QObject::connect(
                         ItemController,
                         &KItemController::PosChangedSignal,

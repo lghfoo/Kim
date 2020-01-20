@@ -11,8 +11,8 @@ namespace Kim {
         Q_OBJECT
     public:
         struct KGrid{
-            qreal CellW = 25;
-            qreal CellH = 25;
+            qreal CellW = 32;
+            qreal CellH = 32;
         };
         class KCursor : public QGraphicsItem{
         public:
@@ -118,7 +118,10 @@ namespace Kim {
             this->setRenderHint(QPainter::Antialiasing);
         }
         virtual void keyReleaseEvent(QKeyEvent *event) override{
+            QGraphicsView::keyReleaseEvent(event);
+            if(event->isAccepted())return;
             emit KeyReleaseSignal(event);
+
         }
 
     };
