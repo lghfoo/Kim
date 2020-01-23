@@ -6,6 +6,7 @@
 #include<QDebug>
 #include<QGraphicsItem>
 #include<QGraphicsSceneDragDropEvent>
+#include<QFileDialog>
 namespace Kim {
     class KScene : public QGraphicsScene{
         Q_OBJECT
@@ -112,18 +113,17 @@ namespace Kim {
     class KCanvasView : public QGraphicsView{
         Q_OBJECT
     signals:
-        void KeyReleaseSignal(QKeyEvent* event);
+        void KeyPressSignal(QKeyEvent* event);
     public:
         KCanvasView(){
             this->setRenderHint(QPainter::Antialiasing);
         }
-        virtual void keyReleaseEvent(QKeyEvent *event) override{
+        virtual void keyPressEvent(QKeyEvent *event) override{
             QGraphicsView::keyReleaseEvent(event);
             if(event->isAccepted())return;
-            emit KeyReleaseSignal(event);
+            emit KeyPressSignal(event);
 
         }
-
     };
 
 

@@ -1,21 +1,25 @@
 #pragma once
 #include"../view/MainView.hpp"
-#include"CanvasController.hpp"
+#include"CanvasWrapperController.hpp"
 namespace Kim {
     class KMainViewController : public QObject{
         Q_OBJECT
     private:
         KMainView* MainView = new KMainView;
-        KCanvasController* CanvasController = new KCanvasController;
+        QList<KCanvasWrapperController*> CanvasWrapperControllers;
+        KCanvasWrapperController* ActiveCanvasWrapper = nullptr;
         QTimer* UpdateStatusBarTimer = new QTimer;
     public:
         KMainViewController(){
-            MainView->setCentralWidget(CanvasController->GetCanvasView());
+
+            ActiveCanvasWrapper = new KCanvasWrapperController;
+            this->MainView->setCentralWidget(ActiveCanvasWrapper->GetView());
+
             connect(UpdateStatusBarTimer,
                     &QTimer::timeout,
                     this,
                     &KMainViewController::UpdateStatusBar);
-            UpdateStatusBarTimer->start(200);
+            UpdateStatusBarTimer->start(100);
         }
         ~KMainViewController(){
             UpdateStatusBarTimer->stop();
@@ -27,33 +31,38 @@ namespace Kim {
     public slots:
         void UpdateStatusBar(){
             using KCanvasState = KCanvasController::KCanvasState;
-            const KCanvasState& CanvasState = CanvasController->GetCanvasState();
-            QString MoveTargetType = "", AddPosType = "";
-            switch (CanvasState.MoveTargetType) {
-            case KCanvasState::MoveItem:
-                MoveTargetType = "Item";
-                break;
-            case KCanvasState::MoveCursor:
-                MoveTargetType = "Cursor";
-                break;
-            }
+            QString Message = "";
+            if(ActiveCanvasWrapper){
+                const KCanvasState& CanvasState = ActiveCanvasWrapper->GetCanvasController()->GetCanvasState();
+                QString MoveTargetType = "", AddPosType = "";
+                switch (CanvasState.MoveTargetType) {
+                case KCanvasState::MoveItem:
+                    MoveTargetType = "Item";
+                    break;
+                case KCanvasState::MoveCursor:
+                    MoveTargetType = "Cursor";
+                    break;
+                default:
+                    break;
+                }
 
-            switch (CanvasState.AddPosType) {
-            case KCanvasState::AtMouse:
-                AddPosType = "AtMouse";
-                break;
-            case KCanvasState::AtCursor:
-                AddPosType = "AtCursor";
-                break;
-            case KCanvasState::AtNearest:
-                AddPosType = "AtNearest";
-                break;
-            default:
-                break;
+                switch (CanvasState.AddPosType) {
+                case KCanvasState::AtMouse:
+                    AddPosType = "AtMouse";
+                    break;
+                case KCanvasState::AtCursor:
+                    AddPosType = "AtCursor";
+                    break;
+                case KCanvasState::AtNearest:
+                    AddPosType = "AtNearest";
+                    break;
+                default:
+                    break;
+                }
+                Message = QString("Move Target: [%1] | Add Object: [%2]")
+                        .arg(MoveTargetType)
+                        .arg(AddPosType);
             }
-            QString Message = QString("Move Target: %1|Add Object: %2")
-                    .arg(MoveTargetType)
-                    .arg(AddPosType);
             MainView->statusBar()->showMessage(Message);
         }
     };

@@ -4,13 +4,22 @@
 #include"ItemController.hpp"
 #include"ConnectionController.hpp"
 namespace Kim {
+    class KTextSerializer;
     class KCanvasController : public QObject{
         Q_OBJECT
+        friend class KTextSerializer;
     public:
         struct KSceneContext{
             KConnectionController* DragingConnectionController = nullptr;
         };
         struct KCanvasState{
+            /**
+             * @brief HasContent
+             * HasContent:
+             *      false: does not items nor connections
+             *      true:  has any items or connections
+             */
+            bool HasContent = false;
             /**
              * @brief The KMoveTargetType enum
              * MoveItem: 按WASD时移动Item
@@ -45,35 +54,68 @@ namespace Kim {
         KSceneContext SceneContext;
         QList<KItemController*>ItemViewControlleres;
         QList<KConnectionController*>ConnectionControlleres;
+    signals:
+        void SaveSingal();
+        void SaveAsSignal();
+        void LoadSignal();
     public slots:
-        void OnKeyRelease(QKeyEvent* Event){
-            switch (Event->key()) {
-            case Qt::Key_Space:
-                OnSpaceRelease();
-                break;
-            // WASD移动
-            case Qt::Key_W:
-                MoveTarget(0, -1);
-                break;
-            case Qt::Key_A:
-                MoveTarget(-1, 0);
-                break;
-            case Qt::Key_S:
-                MoveTarget(0, 1);
-                break;
-            case Qt::Key_D:
-                MoveTarget(1, 0);
-                break;
-            // 切换移动对象
-            case Qt::Key_M:
-                CanvasState.ToNextMoveTargetType();
-                break;
-            // 切换添加位置
-            case Qt::Key_P:
-                CanvasState.ToNextAddPosType();
-                break;
-            default:
-                break;
+        void OnKeyPress(QKeyEvent* Event){
+            // Ctrl + Alt + Key
+            if(Event->modifiers() & Qt::ControlModifier
+                    && Event->modifiers() & Qt::AltModifier){
+                switch (Event->key()) {
+                case Qt::Key_S:
+                    emit SaveAsSignal();
+                    break;
+                default:
+                    break;
+                }
+            }
+            // Ctrl + Key
+            else if(Event->modifiers() & Qt::ControlModifier){
+                switch (Event->key()) {
+                case Qt::Key_S:
+                    emit SaveSingal();
+                    break;
+                case Qt::Key_O:
+                    emit LoadSignal();
+                    break;
+                default:
+                    break;
+                }
+            }
+            // Alt + Key
+            else if(Event->modifiers() & Qt::AltModifier){
+            }
+            else{
+                switch (Event->key()) {
+                case Qt::Key_Space:
+                    OnSpaceRelease();
+                    break;
+                // WASD移动
+                case Qt::Key_W:
+                    MoveTarget(0, -1);
+                    break;
+                case Qt::Key_A:
+                    MoveTarget(-1, 0);
+                    break;
+                case Qt::Key_S:
+                    MoveTarget(0, 1);
+                    break;
+                case Qt::Key_D:
+                    MoveTarget(1, 0);
+                    break;
+                // 切换移动对象
+                case Qt::Key_M:
+                    CanvasState.ToNextMoveTargetType();
+                    break;
+                // 切换添加位置
+                case Qt::Key_P:
+                    CanvasState.ToNextAddPosType();
+                    break;
+                default:
+                    break;
+                }
             }
         }
 
@@ -94,7 +136,9 @@ namespace Kim {
             if(SceneContext.DragingConnectionController)return;
             KConnectionController* Controller = new KConnectionController;
             Controller->SetSrcItemController(ItemController);
-            Scene->addItem(Controller->GetConnectionView());
+//            Scene->addItem(Controller->GetConnectionView());
+            AddItemAt(Controller->GetConnectionView());
+            ConnectionControlleres.append(Controller);
             SceneContext.DragingConnectionController = Controller;
         }
 
@@ -111,21 +155,21 @@ namespace Kim {
             if(SceneContext.DragingConnectionController){
                 auto EndPos = SceneContext.DragingConnectionController->GetConnectionView()->GetTo();
                 auto ItemView = ItemController->GetView();
-                auto Bounding = ItemView->GetGraphics()->boundingRect();
+                auto Bounding = ItemView->ToGraphics()->boundingRect();
                 auto Pos = QPointF(EndPos.x() - Bounding.width() / 2.0,
                                    EndPos.y() - Bounding.height() / 2.0);
                 auto TextItemController = CreateTextItem();
                 ItemViewControlleres.append(TextItemController);
                 SceneContext.DragingConnectionController->SetDstItemController(TextItemController);
-                AddItemAt(TextItemController->GetView()->GetGraphics(), Pos);
+                AddItemAt(TextItemController->GetView()->ToGraphics(), Pos);
                 SceneContext.DragingConnectionController = nullptr;
             }
         }
     public:
         KCanvasController(){
             CanvasView->setScene(Scene);
-            QObject::connect(CanvasView, &KCanvasView::KeyReleaseSignal,
-                             this, &KCanvasController::OnKeyRelease);
+            QObject::connect(CanvasView, &KCanvasView::KeyPressSignal,
+                             this, &KCanvasController::OnKeyPress);
             QObject::connect(Scene, &KScene::DragMoveSignal,
                              this, &KCanvasController::OnDragMove);
             QObject::connect(Scene, &KScene::MouseReleaseSignal,
@@ -195,14 +239,20 @@ namespace Kim {
             default:
                 break;
             }
-            auto Item = ItemController->GetView()->GetGraphics();
-            Item->setPos(Pos);
-            Scene->addItem(Item);
+            auto Item = ItemController->GetView()->ToGraphics();
+            AddItemAt(Item, Pos);
         }
 
-        void AddItemAt(QGraphicsItem* Item, const QPointF& Pos){
+        void AddItemAt(QGraphicsItem* Item, const QPointF& Pos = QPointF(0, 0)){
             Item->setPos(Pos);
             Scene->addItem(Item);
+            OnAddItem(Item);
         }
+
+        void OnAddItem(QGraphicsItem* Item){
+            Q_UNUSED(Item)
+            CanvasState.HasContent = true;
+        }
+
     };
 }
