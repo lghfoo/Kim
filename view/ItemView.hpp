@@ -13,6 +13,10 @@
 #include <QTextLayout>
 #include<QGraphicsScene>
 #include<QGraphicsView>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QTextEdit>
+#include <QDialog>
 namespace Kim {
     class KItemView : public QObject{
         Q_OBJECT
@@ -27,14 +31,82 @@ namespace Kim {
         virtual QString GetTypeAsString() const = 0;
     };
 
-    class KTextItemView: public QGraphicsItem, public KItemView {
+    class KQuickTextEdit : public QTextEdit{
+        Q_OBJECT
+    signals:
+        void PressShiftEnterSignal();
+    public:
+        KQuickTextEdit(const QString& Text){
+            this->setPlainText(Text);
+            this->moveCursor(QTextCursor::End);
+        }
+    protected:
+        virtual void keyPressEvent(QKeyEvent *e) override{
+            if(e->modifiers() & Qt::ShiftModifier
+                    && (e->key() == Qt::Key_Enter || e->key() == Qt::Key_Return)){
+                emit PressShiftEnterSignal();
+            }
+            else{
+                QTextEdit::keyPressEvent(e);
+            }
+        }
+    };
+
+    class KEditTextDialog : public QDialog{
+        Q_OBJECT
+    private:
+        KQuickTextEdit* TextEdit = nullptr;
+    signals:
+        void OKSignal();
+    public slots:
+        void OnCancel(){
+            this->close();
+        }
+    public:
+        QString GetText(){return TextEdit->document()->toPlainText();}
+        KEditTextDialog(const QString& Text = ""){
+            QVBoxLayout* RootLayout = new QVBoxLayout;
+            TextEdit = new KQuickTextEdit(Text);
+            QPushButton* OkButton = new QPushButton(tr("OK"));
+            QPushButton* CancelButton = new QPushButton(tr("Cancel"));
+            QHBoxLayout* ButtonLayout = new QHBoxLayout;
+            ButtonLayout->addWidget(OkButton);
+            ButtonLayout->addWidget(CancelButton);
+            RootLayout->addWidget(TextEdit);
+            RootLayout->addLayout(ButtonLayout);
+            this->setLayout(RootLayout);
+
+            connect(OkButton,
+                    &QPushButton::clicked,
+                    this,
+                    &KEditTextDialog::OKSignal);
+            connect(CancelButton,
+                    &QPushButton::clicked,
+                    this,
+                    &KEditTextDialog::OnCancel);
+            connect(TextEdit,
+                    &KQuickTextEdit::PressShiftEnterSignal,
+                    this,
+                    &KEditTextDialog::OKSignal);
+        }
+    };
+    class KTextItemView: public KItemView, public QGraphicsItem  {
+        Q_OBJECT
     private:
         qreal Padding = 16.0;
         QString Text = "";
         QString PromptText = "Please Enter Text....";
-        QFont Font = QFont("times", 10);
+        QFont Font = QFont("Times", 10);
+    signals:
+        void EditSignal();
     public:
         enum {Type = UserType + 1};
+        static bool IsInvalidChar(const QChar& Char){
+            return Char < 32
+                    && Char != '\n'
+                    && Char != '\r'
+                    && Char != '\t';
+        }
         virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
             if(change == QGraphicsItem::GraphicsItemChange::ItemPositionHasChanged){
                 emit PosChangedSignal();
@@ -93,7 +165,9 @@ namespace Kim {
             return PromptText;
         }
         void AppendText(const QString& Text){
-            this->SetText(this->Text + Text);
+            this->prepareGeometryChange();
+            this->Text.append(Text);
+            this->update();
         }
         void DeleteLast(){
             if(this->Text.isEmpty())return;
@@ -144,7 +218,6 @@ namespace Kim {
             SetupTextLayout(&layout);
             layout.draw(painter, QPointF(boundingRect().x() + Padding/2.0, boundingRect().y() + Padding/2.0));
 
-
             Pen.setColor(Qt::black);
             if(this->isSelected()){
                 Pen.setWidth(3);
@@ -181,17 +254,34 @@ namespace Kim {
         }
 
         virtual void keyPressEvent(QKeyEvent *event)override{
+            qDebug()<<event->text()<<event->key();
+            // shift+enter open edit window
+            if(event->modifiers() & Qt::ShiftModifier && (event->key() == Qt::Key_Enter ||
+                    event->key() == Qt::Key_Return)){
+                emit EditSignal();
+                return;
+            }
+            // filter all modifiers
+            if(event->modifiers() != Qt::NoModifier){
+                event->setAccepted(false);
+                return;
+            }
+            // normal input
             if(event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return){
-                this->AppendText(QString('\n'));
+                this->AppendText(QString(QChar::LineSeparator));
             }
             else if(event->key() == Qt::Key_Backspace){
                 this->DeleteLast();
             }
             else{
-                this->AppendText(event->text());
+                if(event->text().isEmpty() || IsInvalidChar(event->text()[0])){
+                    event->setAccepted(false);
+                    return;
+                }
+                else{
+                    this->AppendText(event->text());
+                }
             }
-//            qDebug()<<event->text();
-//             printf("item key release\n");
         }
 
         virtual void inputMethodEvent(QInputMethodEvent *event)override{

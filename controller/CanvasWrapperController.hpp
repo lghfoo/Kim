@@ -24,7 +24,7 @@ namespace Kim {
             if(LoadFilename.isEmpty())return;
             QFileInfo FileInfo(LoadFilename);
             LastLoadDir = FileInfo.absolutePath();
-            LoadFileHelper(LastLoadDir);
+            LoadFileHelper(LoadFilename);
         }
 
         void SaveAs(){

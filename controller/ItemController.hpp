@@ -1,5 +1,9 @@
 #pragma once
+#include <QDialog>
+#include <QPushButton>
+#include <QTextEdit>
 #include<QTime>
+#include <QVBoxLayout>
 #include"../view/ItemView.hpp"
 namespace Kim {
     static const QString IdentityTimeFormat = "yyyy_MM_dd_hh_mm_ss_zzz";
@@ -81,9 +85,27 @@ namespace Kim {
     };
 
     class KTextItemController : public KItemController{
+        Q_OBJECT
         friend class KTextSerializer;
+
+    public slots:
+        void OnEdit(){
+            KEditTextDialog Dialog(dynamic_cast<KTextItemView*>(ItemView)->GetText());
+            connect(&Dialog,
+                    &KEditTextDialog::OKSignal,
+                    [&](){
+                dynamic_cast<KTextItemView*>(ItemView)->SetText(Dialog.GetText());
+                Dialog.close();
+            });
+            Dialog.exec();
+            return;
+        }
     public:
         KTextItemController():KItemController(new KTextItemView){
+            connect(dynamic_cast<KTextItemView*>(ItemView),
+                    &KTextItemView::EditSignal,
+                    this,
+                    &KTextItemController::OnEdit);
         }
     };
 }

@@ -79,6 +79,12 @@ namespace Kim {
                 emit MouseReleaseSignal(mouseEvent);
             }
         }
+
+        virtual void keyPressEvent(QKeyEvent* event)override{
+            qDebug()<<"Scene"<<event->text()<<event->key();
+            QGraphicsScene::keyPressEvent(event);
+        }
+
         void drawBackground(QPainter *painter, const QRectF &rect) override
         {
             const qreal realLeft = rect.left();
@@ -119,7 +125,8 @@ namespace Kim {
             this->setRenderHint(QPainter::Antialiasing);
         }
         virtual void keyPressEvent(QKeyEvent *event) override{
-            QGraphicsView::keyReleaseEvent(event);
+            qDebug()<<"canvas view"<<event->text()<<event->key();
+            QGraphicsView::keyPressEvent(event);
             if(event->isAccepted())return;
             emit KeyPressSignal(event);
 

@@ -158,7 +158,7 @@ namespace Kim {
                 auto Bounding = ItemView->ToGraphics()->boundingRect();
                 auto Pos = QPointF(EndPos.x() - Bounding.width() / 2.0,
                                    EndPos.y() - Bounding.height() / 2.0);
-                auto TextItemController = CreateTextItem();
+                auto TextItemController = CreateItemController(KTextItemView::Type);
                 ItemViewControlleres.append(TextItemController);
                 SceneContext.DragingConnectionController->SetDstItemController(TextItemController);
                 AddItemAt(TextItemController->GetView()->ToGraphics(), Pos);
@@ -190,14 +190,6 @@ namespace Kim {
         }
 
         void OnMouseRelease(QGraphicsSceneMouseEvent *mouseEvent){
-//            if(SceneContext.DragingConnectionController){
-//                auto Controller = CreateTextItem();
-//                SceneContext.DragingConnectionController->SetDstItemController(Controller);
-//                AddItemAt(Controller->GetView()->GetGraphics(),
-//                          SceneContext.DragingConnectionController->GetConnectionView()->GetTo());
-//                ItemViewControlleres.append(Controller);
-//                SceneContext.DragingConnectionController = nullptr;
-//            }
         }
 
         void OnDragMove(QGraphicsSceneDragDropEvent* event){
@@ -208,22 +200,9 @@ namespace Kim {
         }
 
         void AddTextItem(){
-            auto Controller = CreateTextItem();
+            auto Controller = CreateItemController(KTextItemView::Type);
             AddItem(Controller);
             ItemViewControlleres.append(Controller);
-        }
-
-        KTextItemController* CreateTextItem(){
-            KTextItemController* Controller = new KTextItemController;
-            connect(Controller, &KItemController::StartConnectingSignal,
-                    this, &KCanvasController::OnStartConnecting);
-            connect(Controller, &KItemController::EndConnectingSignal,
-                    this, &KCanvasController::OnEndConnecting);
-            connect(Controller, &KItemController::PosChangedSignal,
-                    this, [=]{Scene->update();});
-            connect(Controller, &KItemController::IgnoreDropSignal,
-                    this, &KCanvasController::OnItemIgnoreDrop);
-            return Controller;
         }
 
         void AddItem(KItemController* ItemController){
@@ -240,6 +219,7 @@ namespace Kim {
                 break;
             }
             auto Item = ItemController->GetView()->ToGraphics();
+            Item->setSelected(true);
             AddItemAt(Item, Pos);
         }
 
@@ -254,5 +234,70 @@ namespace Kim {
             CanvasState.HasContent = true;
         }
 
+        // Deserializing Methods
+        KItemController* CreateItemController(int ItemType){
+            KItemController* Controller = nullptr;
+            switch (ItemType) {
+            case KTextItemView::Type:
+                Controller = new KTextItemController;
+                break;
+            default:
+                qDebug()<<"warning: unkown item type.";
+                break;
+            }
+            connect(Controller, &KItemController::StartConnectingSignal,
+                    this, &KCanvasController::OnStartConnecting);
+            connect(Controller, &KItemController::EndConnectingSignal,
+                    this, &KCanvasController::OnEndConnecting);
+            connect(Controller, &KItemController::PosChangedSignal,
+                    this, [=]{Scene->update();});
+            connect(Controller, &KItemController::IgnoreDropSignal,
+                    this, &KCanvasController::OnItemIgnoreDrop);
+            return Controller;
+        }
+
+        void AddItemContrller(KItemController* ItemController){
+            this->ItemViewControlleres.append(ItemController);
+            this->Scene->addItem(ItemController->GetView()->ToGraphics());
+        }
+
+        KItemController* CreateAndAddItemController(int ItemType){
+            KItemController* Controller = CreateItemController(ItemType);
+            if(Controller){
+                AddItemContrller(Controller);
+            }
+            return Controller;
+        }
+
+        KConnectionController* CreateConnectionController(){
+            KConnectionController* Controller = new KConnectionController;
+            return Controller;
+        }
+
+        void AddConnectionController(KConnectionController* Controller){
+            this->ConnectionControlleres.append(Controller);
+            this->Scene->addItem(Controller->GetConnectionView());
+        }
+
+        KConnectionController* CreateAndAddConnectionController(){
+            KConnectionController* Controller = CreateConnectionController();
+            AddConnectionController(Controller);
+            return Controller;
+        }
+
+        KItemController* GetItemByIdentity(const QString& Identity){
+            for(auto Controller : ItemViewControlleres){
+                if(Controller->GetIdentity() == Identity){
+                    return Controller;
+                }
+            }
+            return nullptr;
+        }
+
+        void RefreshState(){
+            if(!this->ItemViewControlleres.isEmpty()){
+                CanvasState.HasContent = true;
+            }
+        }
     };
 }

@@ -1,6 +1,5 @@
 #pragma once
 #include"Serializer.hpp"
-
 #include <QTextCodec>
 namespace Kim {
     class KTextSerializer: public KSerializer{
@@ -11,6 +10,8 @@ namespace Kim {
             bool NeedComma = false;
             KContext* SavedContext = nullptr;
             // For Deserialize
+            int LineNumber = 1;
+            int ColumnNumber = 1;
             QString KeyToken = "";
             QString ValueToken = "";
             QChar LastChar = '\0';
@@ -18,6 +19,18 @@ namespace Kim {
             bool IsReadingValue = false;
             bool IsReadingKey = false;
             bool LastCharIsPlainBackslash = false;
+            KItemController* CurrentItemController = nullptr;
+            KConnectionController* CurrentConnectionController = nullptr;
+            enum KState {StartState,
+                       CanvasState,
+                       ItemArrayToReadState,
+                       ItemArrayReadingState,
+                       ItemState,
+                       ConnectionArrayToReadState,
+                       ConnectionArrayReadingState,
+                       ConnectionState
+                       };
+            KState State = StartState;
             // Methods
             void Save(){
                 if(!SavedContext){
@@ -39,6 +52,13 @@ namespace Kim {
             void Reset(){
                 this->Depth = 0;
                 this->NeedComma = false;
+            }
+
+            QString DetailError(const QChar& Char){
+                return QString("[%1:%2:%3]")
+                        .arg(LineNumber)
+                        .arg(ColumnNumber)
+                        .arg(Char);
             }
 
             ~KContext(){
@@ -69,10 +89,12 @@ namespace Kim {
 
                 StreamOut << Prefix << "items: ";
                 const QList<KItemController*>& Items = CanvasController->ItemViewControlleres;
+                Context.NeedComma = true;
                 SerializeItems(Items, StreamOut, Context);
 
                 StreamOut << Prefix << "connections: ";
                 const QList<KConnectionController*>& Connections = CanvasController->ConnectionControlleres;
+                Context.NeedComma = false;
                 SerializeConnections(Connections, StreamOut, Context);
 
                 END_OBJECT;
@@ -151,8 +173,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
 
                 END_OBJECT;
             }
-#undef OUT(KEY, VALUE)
-
+#undef OUT
 #undef BEGIN_OBJECT
 #undef END_OBJECT
 #undef BEGIN_ARRAY
@@ -163,7 +184,11 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
             static bool IsPlainChar(QChar Char){
                 return ('a' <= Char && Char <= 'z')
                         || ('A' <= Char && Char <= 'Z')
+                        || ('0' <= Char && Char <= '9')
                         || Char == '_';
+            }
+            static bool IsWhiteChar(QChar Char){
+                return Char == '\t' || Char == '\n' || Char == ' ';
             }
             static void DeserializeCanvas(QTextStream& StreamIn, KCanvasController* CanvasController, KContext& Context){
                 Context.Reset();
@@ -173,7 +198,15 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                     if(Context.IsReadingValue){
                         // '\' and '"' is special in string value
                         if(Char != '\\' && Char != '"'){
-                            Context.ValueToken += Char;
+                            if(KTextItemView::IsInvalidChar(Char)){
+                                // replace invalid char to ' '
+                                //Context.ValueToken += ' ';
+
+                                // skip invalid char
+                            }
+                            else{
+                                Context.ValueToken += Char;
+                            }
                         }
                         else if(Char == '"'){
                             // ....["] or ....\\["]
@@ -209,6 +242,14 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                             }
                         }
                     }
+                    else if(Context.IsReadingKey){
+                        if(IsPlainChar(Char)){
+                            Context.KeyToken += Char;
+                        }
+                        else{
+                            Context.IsReadingKey = false;
+                        }
+                    }
                     else{
                         if(Char == '\t' || Char == ' '){
                             // pass
@@ -231,35 +272,255 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                         else if(Char == '"'){
                             // ....["] or ....\\["]
                             // begin reading string value
-                            if(Context.LastChar != '\\' || Context.LastCharIsPlainBackslash){
-                                Context.IsReadingValue = true;
-                            }
-                            // ....\["]
-                            else{
-                                // pass
-                            }
+                            Context.IsReadingValue = true;
+                            Context.ValueToken = "";
                         }
                         else if(Char == '\\'){
                         }
                         else if(Char == ':'){
 
                         }
-                        else if(!Context.IsReadingValue && IsPlainChar(Char)){
-                            if(IsPlainChar(Context.LastChar)){
-                                Context.KeyToken += Char;
-                            }
-                            else{
-                                Context.KeyToken = Char;
-                                Context.IsReadingKey = true;
-                            }
+                        else if(IsPlainChar(Char)){
+                            Context.KeyToken = Char;
+                            Context.IsReadingKey = true;
                         }
                     }
 
-                    if(Context.IsReadingKey && !IsPlainChar(Char)){
-                        Context.IsReadingKey = false;
+                    switch (Context.State) {
+                    case KContext::StartState:{
+                        if(IsWhiteChar(Char)){
+                            //pass
+                        }
+                        else if(Char == '{'){
+                            Context.State = KContext::CanvasState;
+                        }
+                        else{
+                            // error
+                            qDebug()<<"error: start state error"<<Context.DetailError(Char);
+                        }
+                        break;
                     }
-                    Context.LastChar = Char;
+                    case KContext::CanvasState:{
+                        if(IsWhiteChar(Char) || Char == ',' || IsPlainChar(Char)){
+                            //pass
+                        }
+                        else if(Char == '}'){
+                            Context.State = KContext::StartState;
+                        }
+                        else if(Char == ':'){
+                            if(Context.KeyToken.isEmpty()){
+                                // error
+                                qDebug()<<"error: canvas state error, expect kety token"<<Context.DetailError(Char);
+                            }
+                            else{
+                                if(Context.KeyToken == "items"){
+                                    Context.State = KContext::ItemArrayToReadState;
+                                }
+                                else if(Context.KeyToken == "connections"){
+                                    Context.State = KContext::ConnectionArrayToReadState;
+                                }
+                                Context.KeyToken = "";
+                            }
+                        }
+                        else{
+                            // error
+                            qDebug()<<"error: canvas state error"<<Context.DetailError(Char);
+                        }
+                        break;
+                    }
+                    //////////////////////////////// Items ////////////////////////////////
+                    case KContext::ItemArrayToReadState:{
+                        if(IsWhiteChar(Char)){
+                            // pass
+                        }
+                        else if(Char == '['){
+                            Context.State = KContext::ItemArrayReadingState;
+                        }
+                        else{
+                            // error
+                            qDebug()<<"error: item array state"<<Context.DetailError(Char);
+                        }
+                        break;
+                    }
+                    case KContext::ItemArrayReadingState:{
+                        if(IsWhiteChar(Char) || Char == ','){
+                            // pass
+                        }
+                        else if(Char == '{'){
+                            Context.State = KContext::ItemState;
+                        }
+                        else if(Char == ']'){
+                            Context.State = KContext::CanvasState;
+                        }
+                        else{
+                            // error
+                            qDebug()<<"error: item array reading state"<<Context.DetailError(Char);
+                        }
+                        break;
+                    }
+                    case KContext::ItemState:{
+                        if(IsWhiteChar(Char) || Context.IsReadingValue || Char == ',' || Char == ':' || IsPlainChar(Char)){
 
+                        }
+                        else if(Char == '"'){
+                            if(Context.ValueToken.isEmpty()){
+                                // pass
+                                qDebug()<<"warning: value token is empty"<<Context.DetailError(Char);
+                            }
+                            if(!Context.KeyToken.isEmpty()){
+                                if(Context.CurrentItemController){
+                                    if(Context.KeyToken == "Identity"){
+                                        Context.CurrentItemController->Identity = Context.ValueToken;
+                                    }
+                                    else if(Context.KeyToken == "Alias"){
+                                        Context.CurrentItemController->Alias = Context.ValueToken;
+                                    }
+                                    else if(Context.KeyToken == "CreatedAt"){
+                                        Context.CurrentItemController->CreatedTime = QDateTime::fromString(Context.ValueToken, NormalTimeFormat);
+                                    }
+                                    else if(Context.KeyToken == "LastModifiedAt"){
+                                        Context.CurrentItemController->LastModifiedTime = QDateTime::fromString(Context.ValueToken, NormalTimeFormat);
+                                    }
+                                    else if(Context.KeyToken == "Content"){
+                                        auto Graphics = Context.CurrentItemController->GetView()->ToGraphics();
+                                        switch (Graphics->type()) {
+                                        case KTextItemView::Type:
+                                            qgraphicsitem_cast<KTextItemView*>(Graphics)
+                                                    ->SetText(Context.ValueToken);
+                                            break;
+                                        default:
+                                            qDebug()<<"error: unkown item type to set content"<<Context.DetailError(Char);
+                                            break;
+                                        }
+                                    }
+                                    else if(Context.KeyToken == "Position"){
+                                        QStringList StrList = Context.ValueToken.split(',');
+                                        if(StrList.size() != 2){
+                                            qDebug()<<"error: position size error"<<Context.DetailError(Char);
+                                        }
+                                        else{
+                                            qreal X = StrList[0].trimmed().toDouble();
+                                            qreal Y = StrList[1].trimmed().toDouble();
+                                            Context.CurrentItemController
+                                                    ->GetView()->ToGraphics()->setPos(X, Y);
+                                        }
+                                    }
+                                }
+                                else{
+                                    if(Context.KeyToken == "Type"){
+                                        qInfo()<<"info: creating controller of type: " + Context.ValueToken;
+                                        if(Context.ValueToken == "TextItem"){
+                                            Context.CurrentItemController = CanvasController
+                                                    ->CreateAndAddItemController(KTextItemView::Type);
+                                        }
+                                        else{
+                                            qDebug()<<"error: unkown item type token"<<Context.DetailError(Char);
+                                        }
+                                    }
+                                    else{
+                                        // warning
+                                        qDebug()<<QString("error: meet attr \"%1\" when item is not created").arg(Context.KeyToken)
+                                               <<Context.DetailError(Char);
+                                    }
+                                }
+                                Context.ValueToken = "";
+                                Context.KeyToken = "";
+                            }
+                            else{
+                                // pass
+                            }
+                        }
+                        else if(Char == '}'){
+                            Context.CurrentItemController = nullptr;
+                            Context.State = KContext::ItemArrayReadingState;
+                        }
+                        else{
+                            // error
+                            qDebug()<<"error: item state"<<Context.DetailError(Char);
+                        }
+                        break;
+                    }
+                    //////////////////////////////// Connections ////////////////////////////////
+                    case KContext::ConnectionArrayToReadState:{
+                        if(IsWhiteChar(Char)){
+                            // pass
+                        }
+                        else if(Char == '['){
+                            Context.State = KContext::ConnectionArrayReadingState;
+                        }
+                        else{
+                            // error
+                            qDebug()<<"error: connection array state"<<Context.DetailError(Char);
+                        }
+                        break;
+                    }
+                    case KContext::ConnectionArrayReadingState:{
+                        if(IsWhiteChar(Char) || Char == ','){
+                            // pass
+                        }
+                        else if(Char == '{'){
+                            Context.CurrentConnectionController =
+                                    CanvasController->CreateAndAddConnectionController();
+                            Context.State = KContext::ConnectionState;
+                        }
+                        else if(Char == ']'){
+                            Context.State = KContext::CanvasState;
+                        }
+                        else{
+                            // error
+                            qDebug()<<"error: connection array reading state"<<Context.DetailError(Char);
+                        }
+                        break;
+                    }
+                    case KContext::ConnectionState:{
+                        if(IsWhiteChar(Char) || Context.IsReadingValue || Char == ',' || Char == ':' || IsPlainChar(Char)){
+                            // pass
+                        }
+                        else if(Char == '"'){
+                            if(Context.ValueToken.isEmpty()){
+                                // pass
+                            }
+                            else if(!Context.ValueToken.isEmpty()){
+                                auto ItemController = CanvasController
+                                        ->GetItemByIdentity(Context.ValueToken);
+                                if(!ItemController){
+                                    qWarning()<<"warning: can not find item controller: " + Context.ValueToken;
+                                }
+                                else{
+                                    if(Context.KeyToken == "From"){
+                                        Context.CurrentConnectionController
+                                                ->SetSrcItemController(ItemController);
+                                    }
+                                    else if(Context.KeyToken == "To"){
+                                        Context.CurrentConnectionController
+                                                ->SetDstItemController(ItemController);
+                                    }
+                                }
+                            }
+                            else{
+                                // pass
+                            }
+                        }
+                        else if(Char == '}'){
+                            Context.CurrentConnectionController = nullptr;
+                            Context.State = KContext::ConnectionArrayReadingState;
+                        }
+                        else{
+                            // error
+                            qDebug()<<"error: connection state"<<Context.DetailError(Char);
+                        }
+                        break;
+                    }
+                    }
+
+                    Context.LastChar = Char;
+                    if(Char == '\n'){
+                        Context.LineNumber++;
+                        Context.ColumnNumber = 1;
+                    }
+                    else{
+                        Context.ColumnNumber++;
+                    }
                 }
             }
         };
@@ -291,7 +552,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                 InputFile.close();
             }
             else{
-                qDebug()<<"open file fail.";
+                qDebug()<<QString("open file \"%1\" fail.").arg(InputPath);
             }
         }
 
