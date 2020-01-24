@@ -80,9 +80,23 @@ namespace Kim {
             }
         }
 
+        virtual bool event(QEvent *event)override{
+            if(event->type() == QEvent::KeyPress){
+                QKeyEvent *k = static_cast<QKeyEvent *>(event);
+                if(k->key() == Qt::Key_Tab){
+                    this->keyPressEvent(k);
+                    return true;
+                }
+            }
+            return QGraphicsScene::event(event);
+        }
+
         virtual void keyPressEvent(QKeyEvent* event)override{
-            qDebug()<<"Scene"<<event->text()<<event->key();
             QGraphicsScene::keyPressEvent(event);
+        }
+
+        virtual void keyReleaseEvent(QKeyEvent* event)override{
+            QGraphicsScene::keyReleaseEvent(event);
         }
 
         void drawBackground(QPainter *painter, const QRectF &rect) override
@@ -103,7 +117,6 @@ namespace Kim {
             for (qreal y = firstTopGridLine; y <= realBottom; y += Grid.CellH)
                 lines.append(QLineF(realLeft, y, realRight, y));
 
-            //painter->setRenderHint(QPainter::Antialiasing);
             painter->setPen(QPen(QColor(220, 220, 220), 0.0));
             painter->drawLines(lines.data(), lines.size());
 
@@ -124,8 +137,22 @@ namespace Kim {
         KCanvasView(){
             this->setRenderHint(QPainter::Antialiasing);
         }
+        virtual bool event(QEvent *event)override{
+            if(event->type() == QEvent::KeyPress){
+                QKeyEvent *k = static_cast<QKeyEvent *>(event);
+                if(k->key() == Qt::Key_Tab){
+                    this->keyPressEvent(k);
+                    return true;
+                }
+            }
+            return QGraphicsView::event(event);
+        }
+
+        virtual void keyReleaseEvent(QKeyEvent* event)override{
+            QGraphicsView::keyReleaseEvent(event);
+        }
+
         virtual void keyPressEvent(QKeyEvent *event) override{
-            qDebug()<<"canvas view"<<event->text()<<event->key();
             QGraphicsView::keyPressEvent(event);
             if(event->isAccepted())return;
             emit KeyPressSignal(event);

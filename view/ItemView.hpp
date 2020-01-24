@@ -253,6 +253,21 @@ namespace Kim {
             }
         }
 
+        virtual bool sceneEvent(QEvent* Event)override{
+            if(Event->type() == QEvent::KeyPress){
+                QKeyEvent *k = static_cast<QKeyEvent *>(Event);
+                if(k->key() == Qt::Key_Tab){
+                    this->keyPressEvent(k);
+                    return true;
+                }
+            }
+            return QGraphicsItem::sceneEvent(Event);
+        }
+
+        virtual void keyReleaseEvent(QKeyEvent* event)override{
+            QGraphicsItem::keyReleaseEvent(event);
+        }
+
         virtual void keyPressEvent(QKeyEvent *event)override{
             qDebug()<<event->text()<<event->key();
             // shift+enter open edit window
