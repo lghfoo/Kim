@@ -1,14 +1,19 @@
 #pragma once
 #include"Serializer.hpp"
+#include <QStack>
 #include <QTextCodec>
 namespace Kim {
     class KTextSerializer: public KSerializer{
     public:
+        struct KSavedContext{
+            int Depth = 0;
+            bool NeedComma = false;
+        };
         struct KContext{
             // For Serialize
             int Depth = 0;
             bool NeedComma = false;
-            KContext* SavedContext = nullptr;
+            QStack<KSavedContext>ContextStack;
             // For Deserialize
             int LineNumber = 1;
             int ColumnNumber = 1;
@@ -33,25 +38,21 @@ namespace Kim {
             KState State = StartState;
             // Methods
             void Save(){
-                if(!SavedContext){
-                    SavedContext = new KContext{this->Depth, this->NeedComma};
-                }
-                else{
-                    SavedContext = new (SavedContext)KContext{this->Depth, this->NeedComma};
-                }
-
+                ContextStack.push(KSavedContext{this->Depth, this->NeedComma});
             }
 
             void Restore(){
-                if(SavedContext){
-                    this->Depth = SavedContext->Depth;
-                    this->NeedComma = SavedContext->NeedComma;
+                if(!ContextStack.isEmpty()){
+                    KSavedContext SavedContext = ContextStack.pop();
+                    this->Depth = SavedContext.Depth;
+                    this->NeedComma = SavedContext.NeedComma;
                 }
             }
 
             void Reset(){
                 this->Depth = 0;
                 this->NeedComma = false;
+                ContextStack.clear();
             }
 
             QString DetailError(const QChar& Char){
@@ -61,9 +62,11 @@ namespace Kim {
                         .arg(Char);
             }
 
+            KContext(){
+                ContextStack.clear();
+            }
+
             ~KContext(){
-                if(SavedContext)
-                    delete SavedContext;
             }
         };
 
