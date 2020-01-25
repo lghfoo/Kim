@@ -30,21 +30,27 @@ namespace Kim {
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
             QPointF SrcIntersection, SrcDir,
                     DstIntersection, DstDir;
-            if(SrcItemController){
-                GetIntersecionAndDirection(SrcItemController, SrcIntersection, SrcDir);
-                UpdateDecoration(ConnectionView->GetFromDecoration(),
-                                 SrcIntersection,
-                                 SrcDir,
-                                 SrcItemController->GetView()->pos());
-                ConnectionView->SetFromDecoration(ConnectionView->GetFromDecoration());
+            if(ConnectionView->IsShowFromDecoration() && SrcItemController){
+                auto FromDecor = ConnectionView->GetFromDecoration();
+                FromDecor->IsValid = GetIntersecionAndDirection(SrcItemController, SrcIntersection, SrcDir);
+                if(FromDecor->IsValid){
+                    UpdateDecoration(ConnectionView->GetFromDecoration(),
+                                     SrcIntersection,
+                                     SrcDir,
+                                     SrcItemController->GetView()->pos());
+                    ConnectionView->SetFromDecoration(ConnectionView->GetFromDecoration());
+                }
             }
-            if(DstItemController){
-                GetIntersecionAndDirection(DstItemController, DstIntersection, DstDir);
-                UpdateDecoration(ConnectionView->GetToDecoration(),
-                                 DstIntersection,
-                                 DstDir,
-                                 DstItemController->GetView()->pos());
-                ConnectionView->SetToDecoration(ConnectionView->GetToDecoration());
+            if(ConnectionView->IsShowToDecoration() && DstItemController){
+                auto ToDecor = ConnectionView->GetToDecoration();
+                ToDecor->IsValid = GetIntersecionAndDirection(DstItemController, DstIntersection, DstDir);
+                if(ToDecor->IsValid){
+                    UpdateDecoration(ConnectionView->GetToDecoration(),
+                                     DstIntersection,
+                                     DstDir,
+                                     DstItemController->GetView()->pos());
+                    ConnectionView->SetToDecoration(ConnectionView->GetToDecoration());
+                }
             }
         }
 
@@ -79,7 +85,7 @@ namespace Kim {
             }
         }
 
-        void GetIntersecionAndDirection(KItemController* Controller,
+        bool GetIntersecionAndDirection(KItemController* Controller,
                                         QPointF& OutIntersection, QPointF& OutDirection){
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
             switch (Controller->type()) {
@@ -91,7 +97,7 @@ namespace Kim {
                     //////////////////////////////// Line ////////////////////////////////
                     case KConnectionView::Line:{
                         QLineF Line(ConnectionView->GetFrom(), ConnectionView->GetTo());
-                        RectIntersectLine(Bounding, Line,
+                        return RectIntersectLine(Bounding, Line,
                                           OutIntersection, OutDirection);
                         break;
                     }
@@ -113,7 +119,7 @@ namespace Kim {
     private:
         KItemController* SrcItemController = nullptr;
         KItemController* DstItemController = nullptr;
-        void RectIntersectLine(const QRectF& Bounding, const QLineF Line,
+        bool RectIntersectLine(const QRectF& Bounding, const QLineF Line,
                                QPointF& OutIntersection, QPointF& OutDirection){
             QPointF Intersection;
             QLineF Lines[4] = {
@@ -122,8 +128,9 @@ namespace Kim {
                 QLineF(Bounding.topLeft(), Bounding.bottomLeft()),
                 QLineF(Bounding.topRight(), Bounding.bottomRight())
             };
+            QLineF::IntersectType IntersectType = QLineF::IntersectType::NoIntersection;
             for(int i = 0; i < 4; i++){
-                auto IntersectType = Line.intersect(Lines[i], &Intersection);
+                IntersectType = Line.intersect(Lines[i], &Intersection);
                 if(IntersectType == QLineF::IntersectType::BoundedIntersection){
                     break;
                 }
@@ -132,7 +139,9 @@ namespace Kim {
             OutDirection = (Line.p1() - Line.p2());
             if(!KNormalize(OutDirection)){
                 qWarning()<<"Direction is zero vector.";
+                return false;
             }
+            return IntersectType == QLineF::IntersectType::BoundedIntersection;
         }
     public:
         KConnectionController():KGraphicsObjectController(new KConnectionView){

@@ -9,10 +9,8 @@ namespace Kim {
             int Depth = 0;
             bool NeedComma = false;
         };
-        struct KContext{
+        struct KContext : public KSavedContext{
             // For Serialize
-            int Depth = 0;
-            bool NeedComma = false;
             QStack<KSavedContext>ContextStack;
             // For Deserialize
             int LineNumber = 1;
@@ -20,7 +18,6 @@ namespace Kim {
             QString KeyToken = "";
             QString ValueToken = "";
             QChar LastChar = '\0';
-            QChar LastNonEmptyChar = '\0';
             bool IsReadingValue = false;
             bool IsReadingKey = false;
             bool LastCharIsPlainBackslash = false;
@@ -570,9 +567,9 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
 
         static QString FromEscapedString(const QString& String){
             QString Ret = String;
-            // replace '\\' to '\'
-            Ret.replace("\\\"", "\"");
             // replace '\"' to '"'
+            Ret.replace("\\\"", "\"");
+            // replace '\\' to '\'
             Ret.replace("\\\\", "\\");
             return Ret;
         }

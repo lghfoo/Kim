@@ -5,6 +5,7 @@
 #include"GraphicsViewBase.hpp"
 namespace Kim {
     struct KDecoration{
+        bool IsValid = true;
         virtual int type()const = 0;
         virtual ~KDecoration(){}
         virtual void Paint(QPainter* Painter) = 0;
@@ -115,6 +116,8 @@ namespace Kim {
             }
             this->update();
         }
+        bool IsShowFromDecoration(){return ShowFromDecoration;}
+        bool IsShowToDecoration(){return ShowToDecoration;}
         void SetShapeType(KShapeType ShapeType){
             switch (ShapeType) {
             case KShapeType::Line:
@@ -170,10 +173,10 @@ namespace Kim {
             painter->setPen(Pen);
             painter->drawPath(GetShape());
 
-            if(ShowToDecoration){
+            if(ShowToDecoration && ToDecoration->IsValid){
                 ToDecoration->Paint(painter);
             }
-            if(ShowFromDecoration){
+            if(ShowFromDecoration && FromDecoration->IsValid){
                 FromDecoration->Paint(painter);
             }
         }
