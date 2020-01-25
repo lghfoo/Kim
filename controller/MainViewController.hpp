@@ -14,8 +14,6 @@ namespace Kim {
 
             ActiveCanvasWrapper = new KCanvasWrapperController;
             this->MainView->setCentralWidget(ActiveCanvasWrapper->GetView());
-//            this->MainView->setCentralWidget((new KCanvasController)->GetCanvasView());
-
             connect(UpdateStatusBarTimer,
                     &QTimer::timeout,
                     this,
@@ -35,7 +33,9 @@ namespace Kim {
             QString Message = "";
             if(ActiveCanvasWrapper){
                 const KCanvasState& CanvasState = ActiveCanvasWrapper->GetCanvasController()->GetCanvasState();
-                QString MoveTargetType = "", AddPosType = "";
+                QString MoveTargetType = "",
+                        AddPosType = "",
+                        WriteDirect = "";
                 switch (CanvasState.MoveTargetType) {
                 case KCanvasState::MoveItem:
                     MoveTargetType = "Item";
@@ -60,9 +60,17 @@ namespace Kim {
                 default:
                     break;
                 }
-                Message = QString("Move Target: [%1] | Add Object: [%2]")
+
+                if(CanvasState.WriteDirectly){
+                    WriteDirect = "On";
+                }
+                else{
+                    WriteDirect = "Off";
+                }
+                Message = QString("Move Target: [%1] | Add Object: [%2] | Write Direct: [%3]")
                         .arg(MoveTargetType)
-                        .arg(AddPosType);
+                        .arg(AddPosType)
+                        .arg(WriteDirect);
             }
             MainView->statusBar()->showMessage(Message);
         }

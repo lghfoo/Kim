@@ -1,15 +1,16 @@
-#pragma once
+    #pragma once
 #include <QDialog>
 #include <QPushButton>
 #include <QTextEdit>
 #include<QTime>
 #include <QVBoxLayout>
+#include"GraphicsObjectController.hpp"
 #include"../view/ItemView.hpp"
 namespace Kim {
     static const QString IdentityTimeFormat = "yyyy_MM_dd_hh_mm_ss_zzz";
     static const QString NormalTimeFormat = "yyyy/MM/dd hh:mm:ss";
     class KTextSerializer;
-    class KItemController : public QObject{
+    class KItemController : public KGraphicsObjectController{
         Q_OBJECT
         friend class KTextSerializer;
     protected:
@@ -22,6 +23,7 @@ namespace Kim {
         void EndConnectingSignal(KItemController* Controller);
         void IgnoreDropSignal(KItemController* Controller);
         void PosChangedSignal(const QPointF& NewPow);
+        void SizeChangedSignal(KItemController* Controller);
     public slots:
         void EmitStartConnectingSignal(){
             emit StartConnectingSignal(this);
@@ -30,15 +32,16 @@ namespace Kim {
             emit EndConnectingSignal(this);
         }
         void EmitPosChangeSignal(){
-            emit PosChangedSignal(ItemView->GetCenterPos());
+            emit PosChangedSignal(GraphicsObject->pos());
         }
         void EmitIgnoreDropSignal(){
             emit IgnoreDropSignal(this);
         }
-    protected:
-        KItemView* ItemView = nullptr;
+        void EmitSizeChangedSignal(){
+            emit SizeChangedSignal(this);
+        }
     public:
-        KItemController(KItemView* ItemView):ItemView(ItemView){
+        KItemController(KItemView* ItemView):KGraphicsObjectController(ItemView){
             this->SetCreatedTime(QDateTime::currentDateTime(), true);
             Identity = "Item_" + CreatedTime.toString(IdentityTimeFormat);
             connect(ItemView,
@@ -57,9 +60,17 @@ namespace Kim {
                     &KItemView::IgnoreDropSignal,
                     this,
                     &KItemController::EmitIgnoreDropSignal);
+            connect(ItemView,
+                    &KItemView::SizeChangedSignal,
+                    this,
+                    &KItemController::EmitPosChangeSignal);
+        }
+        virtual ~KItemController(){
+            GraphicsObject->scene()->removeItem(GraphicsObject);
+            delete GraphicsObject;
         }
         KItemView* GetView() {
-            return ItemView;
+            return static_cast<KItemView*>(GraphicsObject);
         }
         void OnModified(){
             LastModifiedTime = QDateTime::currentDateTime();
@@ -87,14 +98,13 @@ namespace Kim {
     class KTextItemController : public KItemController{
         Q_OBJECT
         friend class KTextSerializer;
-
     public slots:
         void OnEdit(){
-            KEditTextDialog Dialog(dynamic_cast<KTextItemView*>(ItemView)->GetText());
+            KEditTextDialog Dialog(dynamic_cast<KTextItemView*>(GraphicsObject)->GetText());
             connect(&Dialog,
                     &KEditTextDialog::OKSignal,
                     [&](){
-                dynamic_cast<KTextItemView*>(ItemView)->SetText(Dialog.GetText());
+                dynamic_cast<KTextItemView*>(GraphicsObject)->SetText(Dialog.GetText());
                 Dialog.close();
             });
             Dialog.exec();
@@ -102,7 +112,7 @@ namespace Kim {
         }
     public:
         KTextItemController():KItemController(new KTextItemView){
-            connect(dynamic_cast<KTextItemView*>(ItemView),
+            connect(dynamic_cast<KTextItemView*>(GraphicsObject),
                     &KTextItemView::EditSignal,
                     this,
                     &KTextItemController::OnEdit);

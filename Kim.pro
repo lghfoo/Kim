@@ -24,15 +24,18 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     common/DragDropProtocol.hpp \
+    common/Math.hpp \
     common/serializer/Serializer.hpp \
     common/serializer/TextSerializer.hpp \
     controller/ApplicationController.hpp \
     controller/CanvasController.hpp \
     controller/CanvasWrapperController.hpp \
     controller/ConnectionController.hpp \
+    controller/GraphicsObjectController.hpp \
     controller/ItemController.hpp \
     controller/MainViewController.hpp \
     view/CanvasView.hpp \
     view/ConnectionView.hpp \
+    view/GraphicsViewBase.hpp \
     view/ItemView.hpp \
     view/MainView.hpp

@@ -88,7 +88,7 @@ namespace Kim {
                 BEGIN_OBJECT;
 
                 StreamOut << Prefix << "items: ";
-                const QList<KItemController*>& Items = CanvasController->ItemViewControlleres;
+                const QList<KItemController*>& Items = CanvasController->ItemControlleres;
                 Context.NeedComma = true;
                 SerializeItems(Items, StreamOut, Context);
 
@@ -128,7 +128,7 @@ namespace Kim {
 
             static void SerializeItem(KItemController* Item, QTextStream& StreamOut, KContext& Context){
                 if(Item && Item->GetView()){
-                    int ItemType = Item->GetView()->ToGraphics()->type();
+                    int ItemType = Item->GetView()->type();
                     switch (ItemType) {
                     case KTextItemView::Type:
                         SerializeTextItem(Item, StreamOut, Context);
@@ -382,7 +382,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                                         Context.CurrentItemController->LastModifiedTime = QDateTime::fromString(Context.ValueToken, NormalTimeFormat);
                                     }
                                     else if(Context.KeyToken == "Content"){
-                                        auto Graphics = Context.CurrentItemController->GetView()->ToGraphics();
+                                        auto Graphics = Context.CurrentItemController->GetView();
                                         switch (Graphics->type()) {
                                         case KTextItemView::Type:
                                             qgraphicsitem_cast<KTextItemView*>(Graphics)
@@ -402,7 +402,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                                             qreal X = StrList[0].trimmed().toDouble();
                                             qreal Y = StrList[1].trimmed().toDouble();
                                             Context.CurrentItemController
-                                                    ->GetView()->ToGraphics()->setPos(X, Y);
+                                                    ->GetView()->setPos(X, Y);
                                         }
                                     }
                                 }

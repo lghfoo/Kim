@@ -7,13 +7,16 @@
 #include<QGraphicsItem>
 #include<QGraphicsSceneDragDropEvent>
 #include<QFileDialog>
+#include <QScrollBar>
 namespace Kim {
     class KScene : public QGraphicsScene{
         Q_OBJECT
     public:
         struct KGrid{
-            qreal CellW = 32;
-            qreal CellH = 32;
+            qreal CellW = 128;
+            qreal CellH = 128;
+            int SubCellWCount = 2;
+            int SubCellHCount = 2;
         };
         class KCursor : public QGraphicsItem{
         public:
@@ -50,15 +53,17 @@ namespace Kim {
         };
     signals:
         void DragMoveSignal(QGraphicsSceneDragDropEvent *mouseEvent);
-        void MouseReleaseSignal(QGraphicsSceneMouseEvent *mouseEvent);
     private:
         KGrid Grid;
         KCursor* Cursor = new KCursor;
+        qreal SceneScale = 5.0;
+        QPointF SceneOffset = QPointF(0, 0);
     public:
         KScene(){
             Cursor->setZValue(1);
             this->addItem(Cursor);
         }
+
         void SetCursorPos(const QPointF& CursorPos){
             Cursor->setPos(CursorPos);
         }
@@ -73,13 +78,6 @@ namespace Kim {
             QGraphicsScene::dragMoveEvent(event);
         }
 
-        virtual void mouseReleaseEvent(QGraphicsSceneMouseEvent *mouseEvent)override{
-            QGraphicsScene::mouseReleaseEvent(mouseEvent);
-            if(!mouseEvent->isAccepted()){
-                emit MouseReleaseSignal(mouseEvent);
-            }
-        }
-
         virtual bool event(QEvent *event)override{
             if(event->type() == QEvent::KeyPress){
                 QKeyEvent *k = static_cast<QKeyEvent *>(event);
@@ -89,6 +87,13 @@ namespace Kim {
                 }
             }
             return QGraphicsScene::event(event);
+        }
+
+        virtual void mousePressEvent(QGraphicsSceneMouseEvent* Event) override{
+            if(!itemAt(Event->scenePos(), QTransform())){
+                Cursor->setPos(Event->scenePos());
+            }
+            QGraphicsScene::mousePressEvent(Event);
         }
 
         virtual void keyPressEvent(QKeyEvent* event)override{
@@ -117,14 +122,17 @@ namespace Kim {
             for (qreal y = firstTopGridLine; y <= realBottom; y += Grid.CellH)
                 lines.append(QLineF(realLeft, y, realRight, y));
 
-            painter->setPen(QPen(QColor(220, 220, 220), 0.0));
+            QPen Pen;
+            Pen.setColor(QColor(180, 180, 180));
+            Pen.setWidth(1);
+            painter->setPen(Pen);
             painter->drawLines(lines.data(), lines.size());
 
             // Draw axes.
-            painter->setPen(QPen(Qt::lightGray, 0.0));
-//            painter->setPen(QPen(Qt::green, 0.0));
+            Pen.setColor(QColor(120, 120, 120));
+            Pen.setWidth(2);
+            painter->setPen(Pen);
             painter->drawLine(QLineF(0, realTop, 0, realBottom));
-//            painter->setPen(QPen(Qt::red, 0.0));
             painter->drawLine(QLineF(realLeft, 0, realRight, 0));
         }
     };
@@ -133,10 +141,12 @@ namespace Kim {
         Q_OBJECT
     signals:
         void KeyPressSignal(QKeyEvent* event);
-    public:
-        KCanvasView(){
-            this->setRenderHint(QPainter::Antialiasing);
+    protected:
+        virtual void showEvent(QShowEvent *event) override{
+            this->ScrollToCenter();
+            QGraphicsView::showEvent(event);
         }
+
         virtual bool event(QEvent *event)override{
             if(event->type() == QEvent::KeyPress){
                 QKeyEvent *k = static_cast<QKeyEvent *>(event);
@@ -148,15 +158,69 @@ namespace Kim {
             return QGraphicsView::event(event);
         }
 
+        void wheelEvent(QWheelEvent *event) override
+        {
+            const qreal Scale = 1.05;
+            if(event->delta() > 0)
+                scale(Scale, Scale);
+            else
+                scale(1 / Scale, 1 / Scale);
+        }
+
         virtual void keyReleaseEvent(QKeyEvent* event)override{
             QGraphicsView::keyReleaseEvent(event);
         }
 
         virtual void keyPressEvent(QKeyEvent *event) override{
+            if(event->key() == Qt::Key_F2)
+                ToggleDragMode();
+            else if(event->key() == Qt::Key_C && event->modifiers() & Qt::ShiftModifier){
+                this->ScrollToCenter();
+            }
             QGraphicsView::keyPressEvent(event);
             if(event->isAccepted())return;
             emit KeyPressSignal(event);
 
+        }
+
+        virtual void mousePressEvent(QMouseEvent* Event)override{
+            if(Event->button() == Qt::MiddleButton)
+                ToggleDragMode();
+            QGraphicsView::mousePressEvent(Event);
+        }
+
+        virtual void mouseMoveEvent(QMouseEvent* Event)override{
+            QGraphicsView::mouseMoveEvent(Event);
+        }
+
+        virtual void mouseReleaseEvent(QMouseEvent* Event)override{
+            QGraphicsView::mouseReleaseEvent(Event);
+        }
+    public:
+        KCanvasView(){
+            setDragMode(QGraphicsView::DragMode::RubberBandDrag);
+            this->setRenderHint(QPainter::Antialiasing);
+        }
+
+        static void ScrollToCenter(QScrollBar* Bar){
+            int Min = Bar->minimum();
+            int Max = Bar->maximum();
+            int Len = Bar->pageStep();
+            Bar->setValue((Max + Min) / 2);
+        }
+
+        void ScrollToCenter(){
+            ScrollToCenter(this->verticalScrollBar());
+            ScrollToCenter(this->horizontalScrollBar());
+        }
+
+        void ToggleDragMode(){
+            if(dragMode() == RubberBandDrag){
+                setDragMode(ScrollHandDrag);
+            }
+            else{
+                setDragMode(RubberBandDrag);
+            }
         }
     };
 

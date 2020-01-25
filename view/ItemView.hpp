@@ -17,18 +17,39 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 #include <QDialog>
+#include"GraphicsViewBase.hpp"
 namespace Kim {
-    class KItemView : public QObject{
+    class KItemView : public KGraphicsViewBase{
         Q_OBJECT
     signals:
         void StartDragDropSignal();
         void EndDragDropSignal();
         void IgnoreDropSignal();
         void PosChangedSignal();
+        void SizeChangedSignal();
     public:
-        virtual QGraphicsItem* ToGraphics() = 0;
-        virtual QPointF GetCenterPos() const = 0;
         virtual QString GetTypeAsString() const = 0;
+    protected:
+        virtual void dropEvent(QGraphicsSceneDragDropEvent *event)override{
+            emit EndDragDropSignal();
+            event->acceptProposedAction();
+        }
+
+        virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event)override{
+            if(event->modifiers() & Qt::ControlModifier){
+                emit StartDragDropSignal();
+                QMimeData* Data = new QMimeData;
+                QDrag* Drag = new QDrag(event->widget());
+                Drag->setMimeData(Data);
+                Qt::DropAction DropAction = Drag->exec();
+                if(DropAction == Qt::IgnoreAction){
+                    emit IgnoreDropSignal();
+                }
+            }
+            else{
+                 QGraphicsItem::mouseMoveEvent(event);
+            }
+        }
     };
 
     class KQuickTextEdit : public QTextEdit{
@@ -90,7 +111,7 @@ namespace Kim {
                     &KEditTextDialog::OKSignal);
         }
     };
-    class KTextItemView: public KItemView, public QGraphicsItem  {
+    class KTextItemView: public KItemView {
         Q_OBJECT
     private:
         qreal Padding = 16.0;
@@ -100,12 +121,17 @@ namespace Kim {
     signals:
         void EditSignal();
     public:
-        enum {Type = UserType + 1};
+        enum {Type = UserType + 2};
+        static bool& IsWriteDirect(){
+            static bool WriteDirect = false;
+            return WriteDirect;
+        }
         static bool IsInvalidChar(const QChar& Char){
-            return Char < 32
+            return (Char < 32
                     && Char != '\n'
                     && Char != '\r'
-                    && Char != '\t';
+                    && Char != '\t')
+                    || Char == 127;
         }
         virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
             if(change == QGraphicsItem::GraphicsItemChange::ItemPositionHasChanged){
@@ -116,7 +142,8 @@ namespace Kim {
                     this->setFocus(Qt::FocusReason::NoFocusReason);
                 }
             }
-            return QGraphicsItem::itemChange(change, value);
+
+            return KGraphicsViewBase::itemChange(change, value);
         }
         static QRectF SetupTextLayout(QTextLayout *layout)
         {
@@ -157,6 +184,7 @@ namespace Kim {
             this->prepareGeometryChange();
             this->Text = Text;
             this->update();
+            emit SizeChangedSignal();
         }
         QString GetText()const{
             return Text;
@@ -165,9 +193,7 @@ namespace Kim {
             return PromptText;
         }
         void AppendText(const QString& Text){
-            this->prepareGeometryChange();
-            this->Text.append(Text);
-            this->update();
+            this->SetText(this->Text + Text);
         }
         void DeleteLast(){
             if(this->Text.isEmpty())return;
@@ -181,21 +207,14 @@ namespace Kim {
                 TempY = -Height / 2.0;
             return QRectF(TempX, TempY, Width, Height);
         }
-        virtual QPointF GetCenterPos() const override{
-            return this->pos();
-        }
+
         KTextItemView(){
             this->setAcceptDrops(true);
-            this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
-            this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
-            this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable, true);
-            this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsGeometryChanges);
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemAcceptsInputMethod);
+            this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable, true);
 
         }
-        virtual QGraphicsItem* ToGraphics() override{
-            return this;
-        }
+
         virtual void paint(QPainter * painter, const QStyleOptionGraphicsItem * option, QWidget * widget = nullptr) override{
             painter->setFont(Font);
             QPen Pen(Qt::black);
@@ -232,27 +251,6 @@ namespace Kim {
         virtual QString GetTypeAsString() const override{return QString("TextItem");}
 
         //////////////////////////////// Events ////////////////////////////////
-        virtual void dropEvent(QGraphicsSceneDragDropEvent *event)override{
-            emit EndDragDropSignal();
-            event->acceptProposedAction();
-        }
-
-        virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event)override{
-            if(event->modifiers() & Qt::ControlModifier){
-                 emit StartDragDropSignal();
-                QMimeData* Data = new QMimeData;
-                QDrag* Drag = new QDrag(event->widget());
-                Drag->setMimeData(Data);
-                Qt::DropAction DropAction = Drag->exec();
-                if(DropAction == Qt::IgnoreAction){
-                    emit IgnoreDropSignal();
-                }
-            }
-            else{
-                 QGraphicsItem::mouseMoveEvent(event);
-            }
-        }
-
         virtual bool sceneEvent(QEvent* Event)override{
             if(Event->type() == QEvent::KeyPress){
                 QKeyEvent *k = static_cast<QKeyEvent *>(Event);
@@ -261,23 +259,27 @@ namespace Kim {
                     return true;
                 }
             }
-            return QGraphicsItem::sceneEvent(Event);
+            return KItemView::sceneEvent(Event);
         }
 
         virtual void keyReleaseEvent(QKeyEvent* event)override{
-            QGraphicsItem::keyReleaseEvent(event);
+            KItemView::keyReleaseEvent(event);
         }
 
         virtual void keyPressEvent(QKeyEvent *event)override{
-            qDebug()<<event->text()<<event->key();
             // shift+enter open edit window
             if(event->modifiers() & Qt::ShiftModifier && (event->key() == Qt::Key_Enter ||
                     event->key() == Qt::Key_Return)){
                 emit EditSignal();
                 return;
             }
-            // filter all modifiers
-            if(event->modifiers() != Qt::NoModifier){
+            if(!IsWriteDirect()){
+                event->setAccepted(false);
+                return;
+            }
+            // filter out ctrl & alt modifiers
+            if((event->modifiers() & Qt::ControlModifier)
+                    ||(event->modifiers() & Qt::AltModifier)){
                 event->setAccepted(false);
                 return;
             }
@@ -300,22 +302,12 @@ namespace Kim {
         }
 
         virtual void inputMethodEvent(QInputMethodEvent *event)override{
-//            printf("input method event\n");
-            if(!event->commitString().isEmpty()){
+            if(IsWriteDirect() && !event->commitString().isEmpty()){
                 this->AppendText(event->commitString());
             }
 
         }
 
-        virtual QVariant inputMethodQuery(Qt::InputMethodQuery query) const override{
-//            printf("input method query\n");
-            return QGraphicsItem::inputMethodQuery(query);
-        }
-
-
-//        virtual QVariant inputMethodQuery(Qt::InputMethodQuery query) const override{
-//            printf("input method query\n");
-//        }
     };
 
    class KTextItemPropertyView{
