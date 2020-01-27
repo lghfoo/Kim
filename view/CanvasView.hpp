@@ -59,6 +59,7 @@ namespace Kim {
         KCursor* Cursor = new KCursor;
         qreal SceneScale = 5.0;
         QPointF SceneOffset = QPointF(0, 0);
+        bool ShowingCursor = true;
     public:
         KScene(){
             Cursor->setZValue(1);
@@ -74,10 +75,17 @@ namespace Kim {
         const KGrid& GetGrid(){
             return Grid;
         }
-//        virtual void dragMoveEvent(QGraphicsSceneDragDropEvent *event)override{
-//            emit DragMoveSignal(event);
-//            QGraphicsScene::dragMoveEvent(event);
-//        }
+
+        void ShowCursor(bool Show){
+            if(ShowingCursor == Show)return;
+            ShowingCursor = Show;
+            if(Show){
+                this->addItem(Cursor);
+            }
+            else{
+                this->removeItem(Cursor);
+            }
+        }
 
         virtual bool event(QEvent *event)override{
             switch (event->type()) {
@@ -168,6 +176,8 @@ namespace Kim {
 
     class KCanvasView : public QGraphicsView{
         Q_OBJECT
+    private:
+        KScene* Scene = new KScene;
     signals:
         void KeyPressSignal(QKeyEvent* event);
     protected:
@@ -177,24 +187,6 @@ namespace Kim {
         }
 
         virtual bool event(QEvent *event)override{
-////            qDebug()<<"[view] [" << event->type()<<"]";
-//            switch (event->type()) {
-//            case QEvent::GraphicsSceneDragEnter:
-//                qDebug()<<"[view] [drag enter]";
-//                break;
-//            case QEvent::GraphicsSceneDragMove:
-//                qDebug()<<"[view] [drag mvoe]";
-//                break;
-//            case QEvent::GraphicsSceneDragLeave:
-//                qDebug()<<"[view] [drag leave]";
-//                break;
-//            case QEvent::GraphicsSceneDrop:
-//                qDebug()<<"[view] [drop]";
-//                break;
-//            default:
-//                break;
-//            }
-
             if(event->type() == QEvent::KeyPress){
                 QKeyEvent *k = static_cast<QKeyEvent *>(event);
                 if(k->key() == Qt::Key_Tab){
@@ -245,8 +237,20 @@ namespace Kim {
         }
     public:
         KCanvasView(){
+            this->setScene(Scene);
+            const int SceneSize = 65536;
+            Scene->setSceneRect(
+                        -SceneSize / 2,
+                        -SceneSize / 2,
+                        SceneSize,
+                        SceneSize
+                        );
             setDragMode(QGraphicsView::DragMode::RubberBandDrag);
             this->setRenderHint(QPainter::Antialiasing);
+        }
+
+        KScene* GetScene(){
+            return Scene;
         }
 
         static void ScrollToCenter(QScrollBar* Bar){

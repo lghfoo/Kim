@@ -3,7 +3,7 @@
 #include"../view/ItemView.hpp"
 #include"ItemController.hpp"
 #include"ConnectionController.hpp"
-
+#include"UnfoldViewController.hpp"
 #include <QLinkedList>
 namespace Kim {
     class KTextSerializer;
@@ -61,7 +61,7 @@ namespace Kim {
     private:
         KCanvasState CanvasState;
         KCanvasView* CanvasView = new KCanvasView;
-        KScene* Scene = new KScene;
+        KScene* Scene = CanvasView->GetScene();
         KSceneContext SceneContext;
         QList<KItemController*>ItemControlleres;
         QList<KConnectionController*>ConnectionControlleres;
@@ -209,14 +209,6 @@ namespace Kim {
         }
     public:
         KCanvasController(){
-            CanvasView->setScene(Scene);
-            const int SceneSize = 65536;
-            Scene->setSceneRect(
-                        -SceneSize / 2,
-                        -SceneSize / 2,
-                        SceneSize,
-                        SceneSize
-                        );
             QObject::connect(CanvasView, &KCanvasView::KeyPressSignal,
                              this, &KCanvasController::OnKeyPress);
             QObject::connect(Scene, &KScene::DragMoveSignal,
@@ -271,6 +263,80 @@ namespace Kim {
                 if(OldConnections){
                     OldConnections->removeOne(ConnectionController);
                 }
+            }
+        }
+
+        void FoldConnection(KConnectionController* ConnController){
+            bool IsFolded = ConnController->IsFolded();
+            // 更新折叠计数
+            ConnController->SetFoldCount(ConnController->GetFoldCount() + 1);
+            // 避免对已折叠的Connection进行处理
+            if(IsFolded)return;
+            auto ConnView = ConnController->GetConnectionView();
+            this->Scene->removeItem(ConnView);
+
+            auto DstItemController = ConnController->GetDstItemController();
+            auto DstView = DstItemController->GetView();
+            this->Scene->removeItem(DstView);
+
+            auto SrcItemController = ConnController->GetSrcItemController();
+            auto SrcView = SrcItemController->GetView();
+            auto FoldCnt = SrcItemController->GetFoldConnectionCount();
+            SrcItemController->SetFoldConnectionCount(FoldCnt+1);
+
+            QLinkedList<KConnectionController*>* DstConns = this->GetConnectionsOfItem(DstItemController);
+            if(DstConns){
+                auto Iter = DstConns->begin();
+                while (Iter!=DstConns->end()) {
+                    // avoid dead loop
+                    if(*Iter != ConnController){
+                        FoldConnection(*Iter);
+                    }
+                    Iter++;
+                }
+            }
+        }
+
+        void UnfoldConnection(KConnectionController* ConnController){
+            ConnController->SetFoldCount(ConnController->GetFoldCount() - 1);
+            if(ConnController->GetFoldCount() > 0)return;
+            this->Scene->addItem(ConnController->GetConnectionView());
+
+            auto SrcItem = ConnController->GetSrcItemController();
+            SrcItem->SetFoldConnectionCount(SrcItem->GetFoldConnectionCount() - 1);
+
+            auto DstItem = ConnController->GetDstItemController();
+            this->Scene->addItem(DstItem->GetView());
+
+            QLinkedList<KConnectionController*>* DstConns = this->GetConnectionsOfItem(DstItem);
+            if(DstConns){
+                auto Iter = DstConns->begin();
+                while(Iter != DstConns->end()){
+                    if(*Iter != ConnController){
+                        UnfoldConnection(*Iter);
+                    }
+                    Iter++;
+                }
+            }
+        }
+
+        void OnConnectionFold(KConnectionController* ConnController){
+            FoldConnection(ConnController);
+        }
+
+        void OnItemRequestUnfold(KItemController* ItemController){
+            KUnfoldViewController* UnfoldController = new KUnfoldViewController(ItemController, ItemConnections);
+            connect(UnfoldController,
+                    &KUnfoldViewController::RequestUnfoldConnectionSignal,
+                    this,
+                    &KCanvasController::OnRequestUnfoldConnections);
+            UnfoldController->Show();
+        }
+
+        void OnRequestUnfoldConnections(const QLinkedList<KConnectionController*>&
+                                        Connections){
+            for(auto Connection : Connections){
+                UnfoldConnection(Connection);
             }
         }
 
@@ -361,6 +427,9 @@ namespace Kim {
                     this, &KCanvasController::OnItemIgnoreDrop);
             connect(Controller, &KGraphicsObjectController::SelectedChangedSignal,
                     this, &KCanvasController::OnItemSelectedChanged);
+            connect(Controller, &KItemController::RequestUnfoldSignal,
+                    this, &KCanvasController::OnItemRequestUnfold);
+
             return Controller;
         }
 
@@ -383,6 +452,8 @@ namespace Kim {
                     this, &KCanvasController::OnItemSelectedChanged);
             connect(Controller, &KConnectionController::ConnectChangedSignal,
                     this, &KCanvasController::OnConnectChanged);
+            connect(Controller, &KConnectionController::FoldSignal,
+                    this, &KCanvasController::OnConnectionFold);
             return Controller;
         }
 

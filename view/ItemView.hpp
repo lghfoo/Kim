@@ -21,6 +21,56 @@
 #include"GraphicsViewBase.hpp"
 namespace Kim {
     //////////////////////////////// Item View ////////////////////////////////
+    class KFoldMark : public QGraphicsObject{
+        Q_OBJECT
+    signals:
+        void ClickedSignal();
+    private:
+        qreal Radius = 10.0;
+        qreal PlusRaidus = Radius * 0.4;
+    protected:
+        virtual void mousePressEvent(QGraphicsSceneMouseEvent* Event)override{
+            emit ClickedSignal();
+        }
+    public:
+        virtual void paint(QPainter* Painter,
+                   const QStyleOptionGraphicsItem* Options,
+                   QWidget* Widget = nullptr)override{
+            QPen Pen;
+            Pen.setWidth(2);
+            Pen.setCapStyle(Qt::PenCapStyle::RoundCap);
+            Painter->setPen(Pen);
+            const QRectF Bounding = GetBounding();
+            QPainterPath Path;
+            Path.moveTo(Bounding.topLeft());
+            Path.addEllipse(Bounding);
+            Painter->fillPath(Path, Qt::white);
+            Painter->drawEllipse(Bounding);
+            const auto& Center = Bounding.center();
+            QLineF HLine = {Center - QPointF{PlusRaidus, 0},
+                            Center + QPointF{PlusRaidus, 0}};
+            QLineF VLine = {Center - QPointF{0, PlusRaidus},
+                            Center + QPointF{0, PlusRaidus}};
+            Painter->drawLine(HLine);
+            Painter->drawLine(VLine);
+        }
+
+        QRectF GetBounding()const{
+            return QRectF(
+                        -Radius,
+                        -Radius,
+                        2 * Radius,
+                        2 * Radius
+                        );
+        }
+
+        virtual QRectF boundingRect()const override{
+            const QRectF& Bounding = GetBounding();
+            qreal Padding = 2.0;
+            qreal W = Bounding.width() + Padding * 2, H = Bounding.height() + Padding * 2;
+            return QRectF(-W/2, -H/2, W, H);
+        }
+    };
     class KItemView : public KGraphicsViewBase{
         Q_OBJECT
     signals:
@@ -30,14 +80,13 @@ namespace Kim {
         void PosChangedSignal();
         void SizeChangedSignal();
     public:
-        virtual QString GetTypeAsString() const = 0;
-        virtual QString GetContent() {return "";}
-        virtual void SetContent(const QString& Content) {Q_UNUSED(Content)}
         KItemView(){
             this->setAcceptDrops(true);
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable, true);
         }
-
+        virtual QString GetTypeAsString() const = 0;
+        virtual QString GetContent() {return "";}
+        virtual void SetContent(const QString& Content) {Q_UNUSED(Content)}
         virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
             if(change == QGraphicsItem::GraphicsItemChange::ItemPositionHasChanged){
                 emit PosChangedSignal();
@@ -47,11 +96,9 @@ namespace Kim {
                     this->setFocus(Qt::FocusReason::NoFocusReason);
                 }
             }
-
             return KGraphicsViewBase::itemChange(change, value);
         }
     protected:
-
         virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event)override{
             if(event->modifiers() & Qt::ControlModifier){
                 emit StartDragDropSignal();
@@ -68,7 +115,6 @@ namespace Kim {
                  QGraphicsItem::mouseMoveEvent(event);
             }
         }
-
         virtual bool sceneEvent(QEvent* Event) override{
             switch (Event->type()) {
             case QEvent::GraphicsSceneDrop:{
@@ -164,72 +210,22 @@ namespace Kim {
         QFont Font = QFont("Times", 10);
     signals:
         void EditSignal();
-    public:
-        static bool& IsWriteDirect(){
-            static bool WriteDirect = false;
-            return WriteDirect;
-        }
-        static bool IsInvalidChar(const QChar& Char){
-            return (Char < 32
-                    && Char != '\n'
-                    && Char != '\r'
-                    && Char != '\t')
-                    || Char == 127;
-        }
-        static QRectF SetupTextLayout(QTextLayout *layout)
-        {
-            layout->setCacheEnabled(true);
-            layout->beginLayout();
-            while (layout->createLine().isValid());
-            layout->endLayout();
-            qreal maxWidth = 0;
-            qreal y = 0;
-            for (int i = 0; i < layout->lineCount(); ++i) {
-                QTextLine line = layout->lineAt(i);
-                maxWidth = qMax(maxWidth, line.naturalTextWidth());
-                line.setPosition(QPointF(0, y));
-                y += line.height();
-            }
-            return QRectF(0, 0, maxWidth, y);
-        }
-        QRectF GetTextSize() const{
-            QRectF br;
-            const QString& Text = this->Text.isEmpty()? this->PromptText : this->Text;
-            if (Text.isEmpty()) {
-                br = QRectF();
-            } else {
-                QString tmp = Text;
-                tmp.replace(QLatin1Char('\n'), QChar::LineSeparator);
-                QTextLayout layout(tmp, Font);
-                br = SetupTextLayout(&layout);
-            }
-            return br;
-        }
-        static QRectF ComputeTextSize(const QString& Text, const QFont& Font){
-            static QGraphicsSimpleTextItem* Item = new QGraphicsSimpleTextItem;
-            Item->setText(Text);
-            Item->setFont(Font);
-            return Item->boundingRect();
-        }
+    public:        
         void SetText(const QString& Text){
             this->prepareGeometryChange();
             this->Text = Text;
             this->update();
             emit SizeChangedSignal();
         }
+
         QString GetText()const{
             return Text;
         }
+
         QString GetPromptText()const{
             return PromptText;
         }
-        void AppendText(const QString& Text){
-            this->SetText(this->Text + Text);
-        }
-        void DeleteLast(){
-            if(this->Text.isEmpty())return;
-            this->SetText(this->Text.remove(this->Text.size() - 1, 1));
-        }
+
         virtual QRectF boundingRect() const override{
             QRectF TextSize = GetTextSize();
             qreal Width = TextSize.width() + Padding,
@@ -241,6 +237,20 @@ namespace Kim {
 
         KTextItemView(){
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemAcceptsInputMethod);
+        }
+
+        virtual ~KTextItemView()override{
+//            qDebug()<<"destroy text item view";
+        }
+
+        virtual KGraphicsViewBase* Clone()override{
+            KTextItemView* View = new KTextItemView;
+            View->setPos(this->pos());
+            View->Padding = this->Padding;
+            View->Text = this->Text;
+            View->PromptText = this->PromptText;
+            View->Font = this->Font;
+            return View;
         }
 
         virtual void paint(QPainter * painter, const QStyleOptionGraphicsItem * option, QWidget * widget = nullptr) override{
@@ -281,6 +291,67 @@ namespace Kim {
         virtual QString GetContent() override{return this->GetText();}
 
         virtual void SetContent(const QString& Content) override{this->SetText(Content);}
+        //////////////////////////////// Utility ////////////////////////////////
+        void AppendText(const QString& Text){
+            this->SetText(this->Text + Text);
+        }
+
+        void DeleteLast(){
+            if(this->Text.isEmpty())return;
+            this->SetText(this->Text.remove(this->Text.size() - 1, 1));
+        }
+
+        static bool& IsWriteDirect(){
+            static bool WriteDirect = false;
+            return WriteDirect;
+        }
+
+        static bool IsInvalidChar(const QChar& Char){
+            return (Char < 32
+                    && Char != '\n'
+                    && Char != '\r'
+                    && Char != '\t')
+                    || Char == 127;
+        }
+
+        static QRectF SetupTextLayout(QTextLayout *layout)
+        {
+            layout->setCacheEnabled(true);
+            layout->beginLayout();
+            while (layout->createLine().isValid());
+            layout->endLayout();
+            qreal maxWidth = 0;
+            qreal y = 0;
+            for (int i = 0; i < layout->lineCount(); ++i) {
+                QTextLine line = layout->lineAt(i);
+                maxWidth = qMax(maxWidth, line.naturalTextWidth());
+                line.setPosition(QPointF(0, y));
+                y += line.height();
+            }
+            return QRectF(0, 0, maxWidth, y);
+        }
+
+        QRectF GetTextSize() const{
+            QRectF br;
+            const QString& Text = this->Text.isEmpty()? this->PromptText : this->Text;
+            if (Text.isEmpty()) {
+                br = QRectF();
+            } else {
+                QString tmp = Text;
+                tmp.replace(QLatin1Char('\n'), QChar::LineSeparator);
+                QTextLayout layout(tmp, Font);
+                br = SetupTextLayout(&layout);
+            }
+            return br;
+        }
+
+        static QRectF ComputeTextSize(const QString& Text, const QFont& Font){
+            static QGraphicsSimpleTextItem* Item = new QGraphicsSimpleTextItem;
+            Item->setText(Text);
+            Item->setFont(Font);
+            return Item->boundingRect();
+        }
+
         //////////////////////////////// Events ////////////////////////////////
         virtual bool sceneEvent(QEvent* Event)override{
             if(Event->type() == QEvent::KeyPress){
@@ -362,6 +433,7 @@ namespace Kim {
 
     public:
         int type() const override { return Type; }
+
         virtual QRectF boundingRect() const override{
             static const QSizeF MinSize(128, 128);
             QRectF Bounding(0, 0, MinSize.width(), MinSize.height());
@@ -376,7 +448,16 @@ namespace Kim {
                         Bounding.height() + Padding
                         );
         }
+
         KImageItemView(){
+        }
+
+        virtual KGraphicsViewBase* Clone()override{
+            KImageItemView* ImageView = new KImageItemView;
+            ImageView->Image = this->Image;
+            ImageView->Format = this->Format;
+            ImageView->setPos(this->pos());
+            return ImageView;
         }
 
         void SetImage(const QImage& Image){

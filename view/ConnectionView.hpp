@@ -2,23 +2,27 @@
 #include<QGraphicsItem>
 #include <QPainter>
 #include<QGraphicsSceneDragDropEvent>
+#include <QKeyEvent>
+#include<QDebug>
 #include"GraphicsViewBase.hpp"
 namespace Kim {
+    //////////////////////////////// Decoration ////////////////////////////////
     struct KDecoration{
         bool IsValid = true;
         virtual int type()const = 0;
         virtual ~KDecoration(){}
-        virtual void Paint(QPainter* Painter) = 0;
+        virtual void Paint(QPainter* Painter, const QBrush& Brush = Qt::black) = 0;
+        virtual KDecoration* Clone(){return nullptr;}
     };
 
     struct KArrowDecoration : public KDecoration{
         enum {Type = 0};
         QPointF EndianPoint = QPointF(0, 0);
         QPointF FromPoint = QPointF(0, 0);
-        qreal VSize = 10;
-        qreal HSize = 16;
+        qreal VSize = 6;
+        qreal HSize = 10;
         virtual int type()const override{return Type;}
-        virtual void Paint(QPainter* Painter)override{
+        virtual void Paint(QPainter* Painter, const QBrush& Brush = Qt::black)override{
             QPointF TransEndian = EndianPoint - FromPoint;
             qreal Distance = std::hypot(TransEndian.x(), TransEndian.y());
             if(Distance > 0){
@@ -32,24 +36,40 @@ namespace Kim {
             Path.lineTo(Neg90);
             Path.lineTo(EndianPoint);
             Path.lineTo(Pos90);
-            Painter->fillPath(Path, QBrush(Qt::black));
+            Painter->fillPath(Path, Brush);
+        }
+        virtual KDecoration* Clone()override{
+            KArrowDecoration* Arrow = new KArrowDecoration;
+            Arrow->EndianPoint = this->EndianPoint;
+            Arrow->FromPoint = this->FromPoint;
+            Arrow->VSize = this->VSize;
+            Arrow->HSize = this->HSize;
+            return Arrow;
         }
     };
 
     struct KRectDecoration : public KDecoration{
         enum {Type = 1};
         virtual int type()const override{return Type;}
-        virtual void Paint(QPainter* Painter)override{
+        virtual void Paint(QPainter* Painter, const QBrush& Brush = Qt::black)override{
+        }
+        virtual KDecoration* Clone()override{
+            KRectDecoration* Rect = new KRectDecoration;
+            return Rect;
         }
     };
 
     struct KCircleDecoration : public KDecoration{
         enum {Type = 2};
         virtual int type()const override{return Type;}
-        virtual void Paint(QPainter* Painter)override{
+        virtual void Paint(QPainter* Painter, const QBrush& Brush = Qt::black)override{
+        }
+        virtual KDecoration* Clone()override{
+            KCircleDecoration* Circle = new KCircleDecoration;
+            return Circle;
         }
     };
-
+    //////////////////////////////// Connection ////////////////////////////////
     class KConnectionView : public KGraphicsViewBase{
         Q_OBJECT
     public:
@@ -61,7 +81,8 @@ namespace Kim {
             qreal VSize = 5;
             qreal HSize = 8;
         };
-
+    signals:
+        void FoldSignal();
     private:
         KShapeType ShapeType = Line;
         QPointF From;
@@ -70,6 +91,7 @@ namespace Kim {
         QPointF To;
         bool ShowFromDecoration = false;
         bool ShowToDecoration = true;
+        bool SelectedOnly = false;
         KDecoration* FromDecoration = new KArrowDecoration;
         KDecoration* ToDecoration = new KArrowDecoration;
     public slots:
@@ -83,23 +105,89 @@ namespace Kim {
             this->To = To;
             this->update();
         }
+    protected:
+        virtual bool sceneEvent(QEvent* Event)override{
+            if(SelectedOnly){
+                if(Event->type() == QEvent::GraphicsSceneMousePress){
+                    return KGraphicsViewBase::sceneEvent(Event);
+                }
+                return true;
+            }
+            switch (Event->type()) {
+            case QEvent::KeyPress:{
+                auto KeyEvent = static_cast<QKeyEvent*>(Event);
+                if(KeyEvent->key() == Qt::Key_H){
+                    emit FoldSignal();
+                }
+                break;
+            }
+            default:
+                break;
+            }
+            return KGraphicsViewBase::sceneEvent(Event);
+        }
     public:
         virtual int type()const override{
             return Type;
         }
+
         KConnectionView(){
             this->setZValue(-1);
         }
+
+        virtual ~KConnectionView() override{
+            delete FromDecoration;
+            delete ToDecoration;
+        }
+
+        virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
+            if(change == QGraphicsItem::GraphicsItemChange::ItemSelectedHasChanged){
+                if(this->isSelected()){
+                    this->setFocus(Qt::FocusReason::NoFocusReason);
+                }
+            }
+            return KGraphicsViewBase::itemChange(change, value);
+        }
+
+        virtual KGraphicsViewBase* Clone() override{
+            KConnectionView* View = new KConnectionView;
+            View->ShapeType = this->ShapeType;
+            View->From = this->From;
+            View->To = this->To;
+            View->setPos(this->pos());
+            View->CtrlFrom = this->CtrlFrom;
+            View->CtrlTo = this->CtrlTo;
+            View->ShowFromDecoration = this->ShowFromDecoration;
+            View->ShowToDecoration = this->ShowToDecoration;
+            View->FromDecoration = this->FromDecoration->Clone();
+            View->ToDecoration = this->ToDecoration->Clone();
+            return View;
+        }
+
+        void SetSelectedOnly(bool Only){
+            this->SelectedOnly = Only;
+        }
+
+        bool IsSelectedOnly()const{
+            return SelectedOnly;
+        }
+
         QPointF GetFrom(){return From;}
+
         QPointF GetTo(){return To;}
+
         QPointF GetCtrlFrom(){return CtrlFrom;}
+
         QPointF GetCtrlTo(){return CtrlTo;}
+
         KDecoration* GetFromDecoration(){
             return FromDecoration;
         }
+
         KDecoration* GetToDecoration(){
             return ToDecoration;
         }
+
         void SetFromDecoration(KDecoration* Decoration){
             this->prepareGeometryChange();
             if(Decoration != FromDecoration){
@@ -108,6 +196,7 @@ namespace Kim {
             }
             this->update();
         }
+
         void SetToDecoration(KDecoration* Decoration){
             this->prepareGeometryChange();
             if(Decoration != ToDecoration){
@@ -116,8 +205,11 @@ namespace Kim {
             }
             this->update();
         }
+
         bool IsShowFromDecoration(){return ShowFromDecoration;}
+
         bool IsShowToDecoration(){return ShowToDecoration;}
+
         void SetShapeType(KShapeType ShapeType){
             switch (ShapeType) {
             case KShapeType::Line:
@@ -128,9 +220,11 @@ namespace Kim {
                 break;
             }
         }
+
         KShapeType GetShapeType(){
             return ShapeType;
         }
+
         virtual QRectF boundingRect() const override{
             qreal Padding = 2.0;
             qreal X = std::min(From.x(), To.x()) - Padding/2.0;
@@ -162,22 +256,28 @@ namespace Kim {
             Stroker.setWidth(16);
             return Stroker.createStroke(GetShape());
         }
+
         virtual void paint(QPainter * painter, const QStyleOptionGraphicsItem * option, QWidget * widget = 0) override{
             QPen Pen = painter->pen();
+            QBrush Brush = Qt::black;
             if(this->isSelected()){
                 Pen.setWidth(3);
             }
             else{
                 Pen.setWidth(1);
             }
+            if(!(this->isEnabled())){
+                Pen.setColor(Qt::lightGray);
+                Brush.setColor(Qt::lightGray);
+            }
             painter->setPen(Pen);
             painter->drawPath(GetShape());
 
             if(ShowToDecoration && ToDecoration->IsValid){
-                ToDecoration->Paint(painter);
+                ToDecoration->Paint(painter, Brush);
             }
             if(ShowFromDecoration && FromDecoration->IsValid){
-                FromDecoration->Paint(painter);
+                FromDecoration->Paint(painter, Brush);
             }
         }
 

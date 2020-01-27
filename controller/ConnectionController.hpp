@@ -14,11 +14,11 @@ namespace Kim {
          * use to record the fold state of the item
          */
         int FoldCount = 0;
-        bool IsFolded = false;
     signals:
         void ConnectChangedSignal(KConnectionController* ConnectionController,
                               KItemController* OldItemController,
                               KItemController* NewItemController);
+        void FoldSignal(KConnectionController*);
     public slots:
         void OnItemSizeChanged(KItemController* Controller){
             UpdateConnectionDecoration();
@@ -153,7 +153,13 @@ namespace Kim {
         }
     public:
         KConnectionController():KGraphicsObjectController(new KConnectionView){
-
+            auto View = static_cast<KConnectionView*>(GraphicsObject);
+            connect(View,
+                    &KConnectionView::FoldSignal,
+                    this,
+                    [=]{
+                emit FoldSignal(this);
+            });
         }
         ~KConnectionController(){
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
@@ -161,6 +167,18 @@ namespace Kim {
                 ConnectionView->scene()->removeItem(ConnectionView);
             }
             delete ConnectionView;
+        }
+
+        bool IsFolded()const{
+            return FoldCount > 0;
+        }
+
+        void SetFoldCount(int FoldCnt){
+            this->FoldCount = FoldCnt;
+        }
+
+        int GetFoldCount()const{
+            return FoldCount;
         }
 
         void SetSrcItemController(KItemController* ItemController){

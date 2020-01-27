@@ -6,6 +6,7 @@ namespace Kim {
     signals:
         void SelectedChangedSignal(bool Selected);
     public:
+        virtual KGraphicsViewBase* Clone(){return nullptr;}
         KGraphicsViewBase(){
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);

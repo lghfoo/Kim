@@ -10,25 +10,26 @@ namespace Kim {
     static const QString IdentityTimeFormat = "yyyy_MM_dd_hh_mm_ss_zzz";
     static const QString NormalTimeFormat = "yyyy/MM/dd hh:mm:ss";
     class KTextSerializer;
+    // TODO:
+    // Modify signal
     class KItemController : public KGraphicsObjectController{
         Q_OBJECT
         friend class KTextSerializer;
+    private:
+        KFoldMark* FoldMark = nullptr;
     protected:
         QDateTime CreatedTime;
         QDateTime LastModifiedTime;
         QString Identity = "";
         QString Alias = "";
-        /**
-         * @brief FoldCount
-         * use to record the fold state of the item
-         */
-        int FoldCount = 0;
+        int FoldConnectionCount = 0;
     signals:
         void StartConnectingSignal(KItemController* Controller);
         void EndConnectingSignal(KItemController* Controller);
         void IgnoreDropSignal(KItemController* Controller);
         void PosChangedSignal(const QPointF& NewPow);
         void SizeChangedSignal(KItemController* Controller);
+        void RequestUnfoldSignal(KItemController* Controller);
     public slots:
         void EmitStartConnectingSignal(){
             emit StartConnectingSignal(this);
@@ -44,6 +45,9 @@ namespace Kim {
         }
         void EmitSizeChangedSignal(){
             emit SizeChangedSignal(this);
+        }
+        void EmitRquestUnfoldSignal(){
+            emit RequestUnfoldSignal(this);
         }
     public:
         KItemController(KItemView* ItemView):KGraphicsObjectController(ItemView){
@@ -96,6 +100,35 @@ namespace Kim {
             CreatedTime = Time;
             if(UpdateLastModified){
                 LastModifiedTime = CreatedTime;
+            }
+        }
+        int GetFoldConnectionCount(){return FoldConnectionCount;}
+        void SetFoldConnectionCount(int FoldConnectionCount){
+            int OldCount = this->FoldConnectionCount, NewCount = FoldConnectionCount;
+            Q_ASSERT(OldCount >= 0 && NewCount >= 0);
+            this->FoldConnectionCount = FoldConnectionCount;
+            // add fold mark
+            if(OldCount == 0 && NewCount > 0){
+                Q_ASSERT(!FoldMark);
+                FoldMark = new KFoldMark;
+                connect(FoldMark,
+                        &KFoldMark::ClickedSignal,
+                        this,
+                        &KItemController::EmitRquestUnfoldSignal);
+                FoldMark->setParentItem(GraphicsObject);
+                // update FoldMark position
+                const auto& ItemBouding = GraphicsObject->boundingRect();
+                const auto& MarkBouding = FoldMark->boundingRect();
+                const qreal Gap = 5.0;
+                const qreal PosY = ItemBouding.center().y();
+                const qreal PosX = ItemBouding.left() - Gap - MarkBouding.width() / 2.0;
+                FoldMark->setPos(PosX, PosY);
+            }
+            // remove fold mark
+            else if(OldCount > 0 && NewCount == 0){
+                Q_ASSERT(FoldMark);
+                delete FoldMark;
+                FoldMark = nullptr;
             }
         }
     };
