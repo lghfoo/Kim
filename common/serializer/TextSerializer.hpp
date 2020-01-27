@@ -133,6 +133,9 @@ namespace Kim {
                     case KTextItemView::Type:
                         SerializeTextItem(Item, StreamOut, Context);
                         break;
+                    case KImageItemView::Type:
+                        SerializeImageItem(Item, StreamOut, Context);
+                        break;
                     default:
                         qDebug()<<"warning: unkown item type";
                         break;
@@ -145,6 +148,18 @@ namespace Kim {
 
 #define OUT(KEY, VALUE)\
 StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
+            static void CommonOut(KItemController* Item,
+                                  KItemView* ItemView,
+                                  QTextStream& StreamOut,
+                                  const QString& Prefix){
+                OUT("Type", ItemView->GetTypeAsString());
+                OUT("Identity", Item->Identity);
+                OUT("Alias", Item->Alias);
+                OUT("CreatedAt", Item->CreatedTime.toString(NormalTimeFormat));
+                OUT("LastModifiedAt", Item->LastModifiedTime.toString(NormalTimeFormat));
+                OUT("Position", QString("%1, %2").arg(ItemView->pos().x()).arg(ItemView->pos().y()));
+                OUT("Content", ToEscapedString(ItemView->GetContent()));
+            }
             static void SerializeConnection(KConnectionController* Connection, QTextStream& StreamOut, KContext& Context){
                 BEGIN_OBJECT;
 
@@ -157,19 +172,33 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
             static void SerializeTextItem(KItemController* Item, QTextStream& StreamOut, KContext& Context){
                 BEGIN_OBJECT;
 
-                KTextItemController* ItemController = dynamic_cast<KTextItemController*>(Item);
-                KTextItemView* ItemView = dynamic_cast<KTextItemView*>(Item->GetView());
-                if(!ItemController || !ItemView){
-                    qDebug()<<"error: type mismatched, KTextItemView is expected.";
-                    return;
-                }
-                OUT("Type", ItemView->GetTypeAsString());
-                OUT("Identity", Item->Identity);
-                OUT("Alias", Item->Alias);
-                OUT("CreatedAt", Item->CreatedTime.toString(NormalTimeFormat));
-                OUT("LastModifiedAt", Item->LastModifiedTime.toString(NormalTimeFormat));
-                OUT("Content", ToEscapedString(ItemView->GetText()));
-                OUT("Position", QString("%1, %2").arg(ItemView->pos().x()).arg(ItemView->pos().y()));
+                CommonOut(Item, Item->GetView(), StreamOut, Prefix);
+//                KTextItemController* ItemController = static_cast<KTextItemController*>(Item);
+//                KTextItemView* ItemView = static_cast<KTextItemView*>(Item->GetView());
+//                OUT("Type", ItemView->GetTypeAsString());
+//                OUT("Identity", Item->Identity);
+//                OUT("Alias", Item->Alias);
+//                OUT("CreatedAt", Item->CreatedTime.toString(NormalTimeFormat));
+//                OUT("LastModifiedAt", Item->LastModifiedTime.toString(NormalTimeFormat));
+//                OUT("Position", QString("%1, %2").arg(ItemView->pos().x()).arg(ItemView->pos().y()));
+//                OUT("Content", ToEscapedString(ItemView->GetContent()));
+
+                END_OBJECT;
+            }
+
+            static void SerializeImageItem(KItemController* Item, QTextStream& StreamOut, KContext& Context){
+                BEGIN_OBJECT;
+
+                CommonOut(Item, Item->GetView(), StreamOut, Prefix);
+//                KImageItemController* ItemController = static_cast<KImageItemController*>(Item);
+//                KImageItemView* ItemView = static_cast<KImageItemView*>(Item->GetView());
+//                OUT("Type", ItemView->GetTypeAsString());
+//                OUT("Identity", Item->Identity);
+//                OUT("Alias", Item->Alias);
+//                OUT("CreatedAt", Item->CreatedTime.toString(NormalTimeFormat));
+//                OUT("LastModifiedAt", Item->LastModifiedTime.toString(NormalTimeFormat));
+//                OUT("Position", QString("%1, %2").arg(ItemView->pos().x()).arg(ItemView->pos().y()));
+//                OUT("Content", ToEscapedString(ItemView->GetContent()));
 
                 END_OBJECT;
             }
@@ -382,16 +411,18 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                                         Context.CurrentItemController->LastModifiedTime = QDateTime::fromString(Context.ValueToken, NormalTimeFormat);
                                     }
                                     else if(Context.KeyToken == "Content"){
-                                        auto Graphics = Context.CurrentItemController->GetView();
-                                        switch (Graphics->type()) {
-                                        case KTextItemView::Type:
-                                            qgraphicsitem_cast<KTextItemView*>(Graphics)
-                                                    ->SetText(Context.ValueToken);
-                                            break;
-                                        default:
-                                            qDebug()<<"error: unkown item type to set content"<<Context.DetailError(Char);
-                                            break;
-                                        }
+                                        auto ItemView = Context.CurrentItemController->GetView();
+                                        ItemView->SetContent(Context.ValueToken);
+//                                        auto Graphics = Context.CurrentItemController->GetView();
+//                                        switch (Graphics->type()) {
+//                                        case KTextItemView::Type:
+//                                            qgraphicsitem_cast<KTextItemView*>(Graphics)
+//                                                    ->SetText(Context.ValueToken);
+//                                            break;
+//                                        default:
+//                                            qDebug()<<"error: unkown item type to set content"<<Context.DetailError(Char);
+//                                            break;
+//                                        }
                                     }
                                     else if(Context.KeyToken == "Position"){
                                         QStringList StrList = Context.ValueToken.split(',');
@@ -412,6 +443,10 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                                         if(Context.ValueToken == "TextItem"){
                                             Context.CurrentItemController = CanvasController
                                                     ->CreateAndAddItemController(KTextItemView::Type);
+                                        }
+                                        else if(Context.ValueToken == "ImageItem"){
+                                            Context.CurrentItemController = CanvasController
+                                                    ->CreateAndAddItemController(KImageItemView::Type);
                                         }
                                         else{
                                             qDebug()<<"error: unkown item type token"<<Context.DetailError(Char);

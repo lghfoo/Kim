@@ -52,7 +52,8 @@ namespace Kim {
             qreal outer_radius = radius + 9;
         };
     signals:
-        void DragMoveSignal(QGraphicsSceneDragDropEvent *mouseEvent);
+        void DragMoveSignal(QGraphicsSceneDragDropEvent *DragDropEvent);
+        void DropSignal(QGraphicsSceneDragDropEvent* DragDropEvent);
     private:
         KGrid Grid;
         KCursor* Cursor = new KCursor;
@@ -73,12 +74,40 @@ namespace Kim {
         const KGrid& GetGrid(){
             return Grid;
         }
-        virtual void dragMoveEvent(QGraphicsSceneDragDropEvent *event)override{
-            emit DragMoveSignal(event);
-            QGraphicsScene::dragMoveEvent(event);
-        }
+//        virtual void dragMoveEvent(QGraphicsSceneDragDropEvent *event)override{
+//            emit DragMoveSignal(event);
+//            QGraphicsScene::dragMoveEvent(event);
+//        }
 
         virtual bool event(QEvent *event)override{
+            switch (event->type()) {
+            case QEvent::GraphicsSceneDragMove:{
+                QGraphicsSceneDragDropEvent* E = static_cast<QGraphicsSceneDragDropEvent*>(event);
+                E->setAccepted(false);
+                QGraphicsScene::event(E);
+                if(!E->isAccepted()){
+                    E->acceptProposedAction();
+                    E->setAccepted(true);
+                }
+                emit DragMoveSignal(E);
+                return true;
+            }
+            case QEvent::GraphicsSceneDrop:{
+                QGraphicsSceneDragDropEvent* E = static_cast<QGraphicsSceneDragDropEvent*>(event);
+                E->setAccepted(false);
+                QGraphicsScene::event(E);
+                if(!E->isAccepted()){
+                    E->acceptProposedAction();
+                    E->setAccepted(true);
+                    emit DropSignal(E);
+                }
+                return true;
+            }
+            default:
+                break;
+            }
+
+
             if(event->type() == QEvent::KeyPress){
                 QKeyEvent *k = static_cast<QKeyEvent *>(event);
                 if(k->key() == Qt::Key_Tab){
@@ -148,6 +177,24 @@ namespace Kim {
         }
 
         virtual bool event(QEvent *event)override{
+////            qDebug()<<"[view] [" << event->type()<<"]";
+//            switch (event->type()) {
+//            case QEvent::GraphicsSceneDragEnter:
+//                qDebug()<<"[view] [drag enter]";
+//                break;
+//            case QEvent::GraphicsSceneDragMove:
+//                qDebug()<<"[view] [drag mvoe]";
+//                break;
+//            case QEvent::GraphicsSceneDragLeave:
+//                qDebug()<<"[view] [drag leave]";
+//                break;
+//            case QEvent::GraphicsSceneDrop:
+//                qDebug()<<"[view] [drop]";
+//                break;
+//            default:
+//                break;
+//            }
+
             if(event->type() == QEvent::KeyPress){
                 QKeyEvent *k = static_cast<QKeyEvent *>(event);
                 if(k->key() == Qt::Key_Tab){

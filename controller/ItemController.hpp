@@ -18,6 +18,11 @@ namespace Kim {
         QDateTime LastModifiedTime;
         QString Identity = "";
         QString Alias = "";
+        /**
+         * @brief FoldCount
+         * use to record the fold state of the item
+         */
+        int FoldCount = 0;
     signals:
         void StartConnectingSignal(KItemController* Controller);
         void EndConnectingSignal(KItemController* Controller);
@@ -94,20 +99,28 @@ namespace Kim {
             }
         }
     };
-
+    //////////////////////////////// Text Item ////////////////////////////////
     class KTextItemController : public KItemController{
         Q_OBJECT
         friend class KTextSerializer;
+    private:
+        KEditTextDialog* Dialog = nullptr;
     public slots:
         void OnEdit(){
-            KEditTextDialog Dialog(dynamic_cast<KTextItemView*>(GraphicsObject)->GetText());
-            connect(&Dialog,
+            auto ItemView = static_cast<KTextItemView*>(GraphicsObject);
+            if(!Dialog){
+                Dialog = new KEditTextDialog(ItemView->GetText());
+            }
+            else{
+                Dialog->SetText(ItemView->GetText());
+            }
+            connect(Dialog,
                     &KEditTextDialog::OKSignal,
-                    [&](){
-                dynamic_cast<KTextItemView*>(GraphicsObject)->SetText(Dialog.GetText());
-                Dialog.close();
+                    [=](){
+                ItemView->SetText(Dialog->GetText());
+                Dialog->close();
             });
-            Dialog.exec();
+            Dialog->show();
             return;
         }
     public:
@@ -116,6 +129,19 @@ namespace Kim {
                     &KTextItemView::EditSignal,
                     this,
                     &KTextItemController::OnEdit);
+        }
+        virtual ~KTextItemController(){
+            if(Dialog){
+                delete Dialog;
+                Dialog = nullptr;
+            }
+        }
+    };
+    //////////////////////////////// Image Item ////////////////////////////////
+    class KImageItemController : public KItemController{
+    public:
+        KImageItemController():KItemController(new KImageItemView){
+
         }
     };
 }

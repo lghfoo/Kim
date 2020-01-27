@@ -5,11 +5,11 @@ namespace Kim {
     public:
         struct MimeType{
             static QString& DragingConnection(){
-                static QString Type = "DragingConnection";
+                static QString Type = "kim/dragdrop";
                 return Type;
             }
             static QString& DragingImage(){
-                static QString Type = "DragingImage";
+                static QString Type = "kim/image";
                 return Type;
             }
         };

@@ -17,8 +17,10 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 #include <QDialog>
+#include <QBuffer>
 #include"GraphicsViewBase.hpp"
 namespace Kim {
+    //////////////////////////////// Item View ////////////////////////////////
     class KItemView : public KGraphicsViewBase{
         Q_OBJECT
     signals:
@@ -29,16 +31,32 @@ namespace Kim {
         void SizeChangedSignal();
     public:
         virtual QString GetTypeAsString() const = 0;
-    protected:
-        virtual void dropEvent(QGraphicsSceneDragDropEvent *event)override{
-            emit EndDragDropSignal();
-            event->acceptProposedAction();
+        virtual QString GetContent() {return "";}
+        virtual void SetContent(const QString& Content) {Q_UNUSED(Content)}
+        KItemView(){
+            this->setAcceptDrops(true);
+            this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable, true);
         }
+
+        virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
+            if(change == QGraphicsItem::GraphicsItemChange::ItemPositionHasChanged){
+                emit PosChangedSignal();
+            }
+            else if(change == QGraphicsItem::GraphicsItemChange::ItemSelectedHasChanged){
+                if(this->isSelected()){
+                    this->setFocus(Qt::FocusReason::NoFocusReason);
+                }
+            }
+
+            return KGraphicsViewBase::itemChange(change, value);
+        }
+    protected:
 
         virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event)override{
             if(event->modifiers() & Qt::ControlModifier){
                 emit StartDragDropSignal();
                 QMimeData* Data = new QMimeData;
+
                 QDrag* Drag = new QDrag(event->widget());
                 Drag->setMimeData(Data);
                 Qt::DropAction DropAction = Drag->exec();
@@ -50,8 +68,24 @@ namespace Kim {
                  QGraphicsItem::mouseMoveEvent(event);
             }
         }
-    };
 
+        virtual bool sceneEvent(QEvent* Event) override{
+            switch (Event->type()) {
+            case QEvent::GraphicsSceneDrop:{
+                KGraphicsViewBase::sceneEvent(Event);
+                QGraphicsSceneDragDropEvent* E = static_cast<QGraphicsSceneDragDropEvent*>(Event);
+                E->acceptProposedAction();
+                E->setAccepted(true);
+                emit EndDragDropSignal();
+                return true;
+            }
+            default:
+                break;
+            }
+            return KGraphicsViewBase::sceneEvent(Event);
+        }
+    };
+    //////////////////////////////// Text Item ////////////////////////////////
     class KQuickTextEdit : public QTextEdit{
         Q_OBJECT
     signals:
@@ -71,8 +105,13 @@ namespace Kim {
                 QTextEdit::keyPressEvent(e);
             }
         }
-    };
 
+
+        virtual void showEvent(QShowEvent * e) override{
+            this->moveCursor(QTextCursor::End);
+            QTextEdit::showEvent(e);
+        }
+    };
     class KEditTextDialog : public QDialog{
         Q_OBJECT
     private:
@@ -110,9 +149,14 @@ namespace Kim {
                     this,
                     &KEditTextDialog::OKSignal);
         }
+        void SetText(const QString& Text){
+            TextEdit->setText(Text);
+        }
     };
     class KTextItemView: public KItemView {
         Q_OBJECT
+    public:
+        enum {Type = UserType + 2};
     private:
         qreal Padding = 16.0;
         QString Text = "";
@@ -121,7 +165,6 @@ namespace Kim {
     signals:
         void EditSignal();
     public:
-        enum {Type = UserType + 2};
         static bool& IsWriteDirect(){
             static bool WriteDirect = false;
             return WriteDirect;
@@ -132,18 +175,6 @@ namespace Kim {
                     && Char != '\r'
                     && Char != '\t')
                     || Char == 127;
-        }
-        virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
-            if(change == QGraphicsItem::GraphicsItemChange::ItemPositionHasChanged){
-                emit PosChangedSignal();
-            }
-            else if(change == QGraphicsItem::GraphicsItemChange::ItemSelectedHasChanged){
-                if(this->isSelected()){
-                    this->setFocus(Qt::FocusReason::NoFocusReason);
-                }
-            }
-
-            return KGraphicsViewBase::itemChange(change, value);
         }
         static QRectF SetupTextLayout(QTextLayout *layout)
         {
@@ -209,10 +240,7 @@ namespace Kim {
         }
 
         KTextItemView(){
-            this->setAcceptDrops(true);
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemAcceptsInputMethod);
-            this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsMovable, true);
-
         }
 
         virtual void paint(QPainter * painter, const QStyleOptionGraphicsItem * option, QWidget * widget = nullptr) override{
@@ -250,6 +278,9 @@ namespace Kim {
 
         virtual QString GetTypeAsString() const override{return QString("TextItem");}
 
+        virtual QString GetContent() override{return this->GetText();}
+
+        virtual void SetContent(const QString& Content) override{this->SetText(Content);}
         //////////////////////////////// Events ////////////////////////////////
         virtual bool sceneEvent(QEvent* Event)override{
             if(Event->type() == QEvent::KeyPress){
@@ -264,6 +295,11 @@ namespace Kim {
 
         virtual void keyReleaseEvent(QKeyEvent* event)override{
             KItemView::keyReleaseEvent(event);
+        }
+
+        virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)override{
+            KItemView::mouseDoubleClickEvent(event);
+            emit EditSignal();
         }
 
         virtual void keyPressEvent(QKeyEvent *event)override{
@@ -309,8 +345,130 @@ namespace Kim {
         }
 
     };
+    //////////////////////////////// Image Item ////////////////////////////////
+    class KImageItemView : public KItemView{
+    public: // type def
+        enum{Type = UserType+3};
+    signals: // signals
 
-   class KTextItemPropertyView{
+    private slots:
+    protected slots:
+    public slots:
 
-   };
+    private:
+        QImage Image;
+        QString Format = "";
+    protected:
+
+    public:
+        int type() const override { return Type; }
+        virtual QRectF boundingRect() const override{
+            static const QSizeF MinSize(128, 128);
+            QRectF Bounding(0, 0, MinSize.width(), MinSize.height());
+            if(Image.rect().width() > 0 && Image.rect().height() > 0){
+                Bounding = Image.rect();
+            }
+            qreal Padding = 2;
+            return QRectF(
+                        -(Bounding.width() + Padding) / 2.0,
+                        -(Bounding.height() + Padding) / 2.0,
+                        Bounding.width() + Padding,
+                        Bounding.height() + Padding
+                        );
+        }
+        KImageItemView(){
+        }
+
+        void SetImage(const QImage& Image){
+            this->prepareGeometryChange();
+            this->Image = Image;
+            this->update();
+            emit SizeChangedSignal();
+//            qDebug()<<"Content"<<this->GetContent();
+        }
+
+        void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override
+        {
+            QPen Pen(Qt::black);
+            painter->setPen(Pen);
+            QPainterPath Path;
+            const QRectF& Bounding = this->boundingRect();
+            Path.moveTo(Bounding.topLeft());
+            Path.addRoundedRect(Bounding, 5.0, 5.0);
+            painter->fillPath(Path, QBrush(Qt::white));
+
+            painter->save();
+            painter->setClipPath(Path);
+            painter->drawImage(boundingRect(), Image, Image.rect());
+            painter->restore();
+
+            Pen.setColor(Qt::black);
+            if(this->isSelected()){
+                Pen.setWidth(3);
+            }
+            painter->setPen(Pen);
+            painter->drawPath(Path);
+        }
+
+        virtual void dropEvent(QGraphicsSceneDragDropEvent* Event) override{
+            auto MimeData = Event->mimeData();
+            this->Format = "";
+            if(Event->mimeData()->hasImage()){
+                SetImage(qvariant_cast<QImage>(Event->mimeData()->imageData()));
+            }
+            else if(MimeData->hasUrls()){
+                const QList<QUrl>& Urls = MimeData->urls();
+                const static QStringList SupportedFormats{
+                    ".BMP",
+                    ".GIF",
+                    ".JPG",
+                    ".JPEG",
+                    ".PNG",
+                    ".PBM",
+                    ".PGM",
+                    ".PPM",
+                    ".XBM",
+                    ".XPM"
+                };
+                bool ShouldBreak = false;
+                for(const QUrl& Url : Urls){
+                    const QString UrlString = Url.toDisplayString();
+                    const QString UrlStringUpper = UrlString.toUpper();
+                    for(const QString& Format : SupportedFormats){
+                        if(UrlStringUpper.endsWith(Format)){
+                            if(Url.isLocalFile()){
+                                // todo: save format
+//                                this->Format = Format;
+//                                this->Format.replace(".", "");
+                                SetImage(QImage(Url.toLocalFile()));
+                                ShouldBreak = true;
+                                break;
+                            }
+                        }
+                    }
+                    if(ShouldBreak)break;
+                }
+            }
+        }
+
+        virtual QString GetTypeAsString() const override{
+            return QString("ImageItem");
+        }
+
+        virtual QString GetContent() override{
+            QByteArray Array;
+            QBuffer Buffer(&Array);
+            Buffer.open(QIODevice::ReadWrite);
+            QString Format = this->Format.isEmpty()? "PNG" : this->Format;
+            Image.save(&Buffer, Format.toStdString().c_str());
+            return Array.toBase64();
+        }
+
+        virtual void SetContent(const QString& Content)override{
+            QByteArray Array = QByteArray::fromBase64(Content.toUtf8());
+            QBuffer Buffer(&Array);
+            Buffer.open(QIODevice::ReadOnly);
+            Image.loadFromData(Array);
+        }
+    };
 }

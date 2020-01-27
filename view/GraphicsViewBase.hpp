@@ -10,6 +10,7 @@ namespace Kim {
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsFocusable);
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemIsSelectable);
             this->setFlag(QGraphicsItem::GraphicsItemFlag::ItemSendsGeometryChanges);
+
         }
 
         virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{

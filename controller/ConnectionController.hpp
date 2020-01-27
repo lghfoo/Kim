@@ -8,6 +8,13 @@
 namespace Kim {
     class KConnectionController : public KGraphicsObjectController{
         Q_OBJECT
+    private:
+        /**
+         * @brief FoldCount
+         * use to record the fold state of the item
+         */
+        int FoldCount = 0;
+        bool IsFolded = false;
     signals:
         void ConnectChangedSignal(KConnectionController* ConnectionController,
                               KItemController* OldItemController,
@@ -89,8 +96,9 @@ namespace Kim {
                                         QPointF& OutIntersection, QPointF& OutDirection){
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
             switch (Controller->type()) {
-            //////////////////////////////// TextItem ////////////////////////////////
-            case KTextItemView::Type:{
+            //////////////////////////////// TextItem & ImageItem ////////////////////////////////
+            case KTextItemView::Type:
+            case KImageItemView::Type:{
                 auto View = Controller->GetView();
                 const QRectF& Bounding = View->mapToScene(View->boundingRect()).boundingRect();
                 switch (ConnectionView->GetShapeType()) {

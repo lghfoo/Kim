@@ -105,6 +105,7 @@ namespace Kim {
                     break;
                 }
             }
+            // Key
             else{
                 switch (Event->key()) {
                 case Qt::Key_Delete:
@@ -133,6 +134,14 @@ namespace Kim {
                 // 切换添加位置
                 case Qt::Key_P:
                     CanvasState.ToNextAddPosType();
+                    break;
+                // 1: 添加文本
+                // 2: 添加图片
+                case Qt::Key_1:
+                    AddTextItem();
+                    break;
+                case Qt::Key_2:
+                    AddImageItem();
                     break;
                 default:
                     break;
@@ -178,6 +187,19 @@ namespace Kim {
 
         void OnItemIgnoreDrop(KItemController* ItemController){
             if(SceneContext.DragingConnectionController){
+                CancelConnecting();
+            }
+        }
+
+        void OnSceneDragMove(QGraphicsSceneDragDropEvent* event){
+            if(SceneContext.DragingConnectionController){
+                SceneContext.DragingConnectionController->UpdateDstPosition(event->scenePos());
+                Scene->update();
+            }
+        }
+
+        void OnSceneDrop(QGraphicsSceneDragDropEvent* Event){
+            if(SceneContext.DragingConnectionController){
                 auto TextItemController = CreateAndAddItemController(KTextItemView::Type);
                 auto Pos = SceneContext.DragingConnectionController->GetConnectionView()->GetTo();
                 TextItemController->GetView()->setPos(Pos);
@@ -198,7 +220,9 @@ namespace Kim {
             QObject::connect(CanvasView, &KCanvasView::KeyPressSignal,
                              this, &KCanvasController::OnKeyPress);
             QObject::connect(Scene, &KScene::DragMoveSignal,
-                             this, &KCanvasController::OnDragMove);
+                             this, &KCanvasController::OnSceneDragMove);
+            QObject::connect(Scene, &KScene::DropSignal,
+                             this, &KCanvasController::OnSceneDrop);
 
         }
 
@@ -216,6 +240,13 @@ namespace Kim {
 
         void OnSpacePress(){
             AddTextItem();
+        }
+
+        void CancelConnecting(){
+            if(SceneContext.DragingConnectionController){
+                DeleteConnection(SceneContext.DragingConnectionController);
+                SceneContext.DragingConnectionController = nullptr;
+            }
         }
 
         void OnConnectChanged(KConnectionController* ConnectionController,
@@ -253,15 +284,14 @@ namespace Kim {
             return nullptr;
         }
 
-        void OnDragMove(QGraphicsSceneDragDropEvent* event){
-            if(SceneContext.DragingConnectionController){
-                SceneContext.DragingConnectionController->UpdateDstPosition(event->scenePos());
-                Scene->update();
-            }
-        }
-
         void AddTextItem(){
             auto Controller = CreateItemController(KTextItemView::Type);
+            AddItem(Controller);
+            ItemControlleres.append(Controller);
+        }
+
+        void AddImageItem(){
+            auto Controller = CreateItemController(KImageItemView::Type);
             AddItem(Controller);
             ItemControlleres.append(Controller);
         }
@@ -312,6 +342,9 @@ namespace Kim {
             switch (ItemType) {
             case KTextItemView::Type:
                 Controller = new KTextItemController;
+                break;
+            case KImageItemView::Type:
+                Controller = new KImageItemController;
                 break;
             default:
                 qDebug()<<"warning: unkown item type.";
