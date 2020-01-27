@@ -1,14 +1,16 @@
 #pragma once
 #include<QWidget>
 #include<QStackedLayout>
+#include"../view/CanvasWrapperView.hpp"
 #include"CanvasController.hpp"
+#include<QDockWidget>
 #include"../common/serializer/TextSerializer.hpp"
 namespace Kim {
     class KCanvasWrapperController : public QObject{
         Q_OBJECT
     private:
-        QWidget* View = new QWidget;
         KCanvasController* CanvasController = new KCanvasController;
+        KCanvasWrapperView* View = new KCanvasWrapperView(CanvasController->GetCanvasView());
         QString SavedFilename = "";
         QString LastSavedDir = "";
         QString LastLoadDir = "";
@@ -37,9 +39,6 @@ namespace Kim {
         }
     public:
         KCanvasWrapperController(){
-            QLayout* Layout = new QStackedLayout;
-            Layout->addWidget(CanvasController->GetCanvasView());
-            View->setLayout(Layout);
             connect(CanvasController,
                     &KCanvasController::SaveSingal,
                     this,

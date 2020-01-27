@@ -1,5 +1,6 @@
 #pragma once
 #include<QMainWindow>
+#include <QPushButton>
 #include <QStatusBar>
 #include"CanvasView.hpp"
 namespace Kim {

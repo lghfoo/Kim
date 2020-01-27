@@ -36,6 +36,7 @@ HEADERS += \
     controller/MainViewController.hpp \
     controller/UnfoldViewController.hpp \
     view/CanvasView.hpp \
+    view/CanvasWrapperView.hpp \
     view/ConnectionView.hpp \
     view/GraphicsViewBase.hpp \
     view/ItemView.hpp \

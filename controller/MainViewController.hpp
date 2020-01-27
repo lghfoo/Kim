@@ -11,7 +11,6 @@ namespace Kim {
         QTimer* UpdateStatusBarTimer = new QTimer;
     public:
         KMainViewController(){
-
             ActiveCanvasWrapper = new KCanvasWrapperController;
             this->MainView->setCentralWidget(ActiveCanvasWrapper->GetView());
             connect(UpdateStatusBarTimer,

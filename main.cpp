@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
 // 8、scroll到指点item
 // 9、快捷键提示
 // 10、connection支持文本输入
+// 11、工具面板
 
 // 2020/1/26 22:03
 // TODO:
