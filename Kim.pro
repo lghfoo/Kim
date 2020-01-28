@@ -41,4 +41,9 @@ HEADERS += \
     view/GraphicsViewBase.hpp \
     view/ItemView.hpp \
     view/MainView.hpp \
+    view/ToolView/HelpView.hpp \
+    view/ToolView/SpecialInputView.hpp \
     view/UnfoldView.hpp
+
+RESOURCES += \
+    resources.qrc

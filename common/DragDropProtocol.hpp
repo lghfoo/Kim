@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include<QString>
 namespace Kim {
     class DragDropProtocol{
@@ -11,7 +11,7 @@ namespace Kim {
             static QString& DragingImage(){
                 static QString Type = "kim/image";
                 return Type;
-            }
+            }            
         };
     };
 }

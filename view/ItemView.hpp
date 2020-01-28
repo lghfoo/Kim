@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include<QGraphicsItem>
 #include<QGraphicsTextItem>
 #include<QGraphicsSimpleTextItem>
@@ -18,6 +18,8 @@
 #include <QTextEdit>
 #include <QDialog>
 #include <QBuffer>
+#include<QApplication>
+#include <QClipboard>
 #include"GraphicsViewBase.hpp"
 namespace Kim {
     //////////////////////////////// Item View ////////////////////////////////
@@ -218,6 +220,36 @@ namespace Kim {
             emit SizeChangedSignal();
         }
 
+        void SetText(const QMimeData* MimeData){
+            if(MimeData->hasUrls()){
+                const QList<QUrl>& Urls = MimeData->urls();
+                const QStringList& SupportedFormats = GetSupportedFormats();
+                bool ShouldBreak = false;
+                for(const QUrl& Url : Urls){
+                    const QString UrlString = Url.toDisplayString();
+                    const QString UrlStringUpper = UrlString.toUpper();
+                    for(const QString& Format : SupportedFormats){
+                        if(UrlStringUpper.endsWith(Format)){
+                            if(Url.isLocalFile()){
+                                QFile TextFile(Url.toLocalFile());
+                                if(TextFile.open(QIODevice::ReadOnly|QIODevice::Text)){
+                                    QTextStream Stream(&TextFile);
+                                    this->SetText(Stream.readAll());
+                                    ShouldBreak = true;
+                                    TextFile.close();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if(ShouldBreak)break;
+                }
+            }
+            else if(MimeData->hasText()){
+                SetText(MimeData->text());
+            }
+        }
+
         QString GetText()const{
             return Text;
         }
@@ -352,6 +384,40 @@ namespace Kim {
             return Item->boundingRect();
         }
 
+        static QStringList GetSupportedFormats(){
+            const static QStringList SupportedFormats{
+                ".TXT",
+                ".CPP",
+                ".H",
+                ".C",
+                ".CS",
+                ".PY",
+                ".HPP",
+            };
+            return SupportedFormats;
+        }
+
+        static bool HasTextData(const QMimeData* MimeData){
+            if(MimeData->hasUrls()){
+                const QList<QUrl>& Urls = MimeData->urls();
+                const QStringList& SupportedFormats = GetSupportedFormats();
+                for(const QUrl& Url : Urls){
+                    const QString UrlString = Url.toDisplayString();
+                    const QString UrlStringUpper = UrlString.toUpper();
+                    for(const QString& Format : SupportedFormats){
+                        if(UrlStringUpper.endsWith(Format)){
+                            if(Url.isLocalFile()){
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            if(MimeData->hasText()){
+                return true;
+            }
+            return false;
+        }
         //////////////////////////////// Events ////////////////////////////////
         virtual bool sceneEvent(QEvent* Event)override{
             if(Event->type() == QEvent::KeyPress){
@@ -378,6 +444,15 @@ namespace Kim {
             if(event->modifiers() & Qt::ShiftModifier && (event->key() == Qt::Key_Enter ||
                     event->key() == Qt::Key_Return)){
                 emit EditSignal();
+                return;
+            }
+            // ctrl v
+            if(event->modifiers() & Qt::ControlModifier
+                    && event->key() == Qt::Key_V){
+                QClipboard* Clipboard = QApplication::clipboard();
+                auto Data = Clipboard->mimeData();
+                this->SetText(Data);
+                event->setAccepted(true);
                 return;
             }
             if(!IsWriteDirect()){
@@ -415,13 +490,18 @@ namespace Kim {
 
         }
 
+        virtual void dropEvent(QGraphicsSceneDragDropEvent* Event) override{
+            auto MimeData = Event->mimeData();
+            SetText(MimeData);
+        }
     };
     //////////////////////////////// Image Item ////////////////////////////////
     class KImageItemView : public KItemView{
+        Q_OBJECT
     public: // type def
         enum{Type = UserType+3};
     signals: // signals
-
+        void EditSignal();
     private slots:
     protected slots:
     public slots:
@@ -468,6 +548,35 @@ namespace Kim {
 //            qDebug()<<"Content"<<this->GetContent();
         }
 
+        void SetImage(const QMimeData* MimeData){
+            if(MimeData->hasImage()){
+                SetImage(qvariant_cast<QImage>(MimeData->imageData()));
+            }
+            else if(MimeData->hasUrls()){
+                this->Format = "";
+                const QList<QUrl>& Urls = MimeData->urls();
+                const QStringList& SupportedFormats = GetSupportedFormats();
+                bool ShouldBreak = false;
+                for(const QUrl& Url : Urls){
+                    const QString UrlString = Url.toDisplayString();
+                    const QString UrlStringUpper = UrlString.toUpper();
+                    for(const QString& Format : SupportedFormats){
+                        if(UrlStringUpper.endsWith(Format)){
+                            if(Url.isLocalFile()){
+                                // todo: save format
+//                                this->Format = Format;
+//                                this->Format.replace(".", "");
+                                SetImage(QImage(Url.toLocalFile()));
+                                ShouldBreak = true;
+                                break;
+                            }
+                        }
+                    }
+                    if(ShouldBreak)break;
+                }
+            }
+        }
+
         void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override
         {
             QPen Pen(Qt::black);
@@ -491,45 +600,47 @@ namespace Kim {
             painter->drawPath(Path);
         }
 
-        virtual void dropEvent(QGraphicsSceneDragDropEvent* Event) override{
-            auto MimeData = Event->mimeData();
-            this->Format = "";
-            if(Event->mimeData()->hasImage()){
-                SetImage(qvariant_cast<QImage>(Event->mimeData()->imageData()));
+        static QStringList GetSupportedFormats(){
+            const static QStringList SupportedFormats{
+                ".BMP",
+                ".GIF",
+                ".JPG",
+                ".JPEG",
+                ".PNG",
+                ".PBM",
+                ".PGM",
+                ".PPM",
+                ".XBM",
+                ".XPM"
+            };
+            return SupportedFormats;
+        }
+
+        static bool HasImageData(const QMimeData* MimeData){
+            if(MimeData->hasImage()){
+                return true;
             }
-            else if(MimeData->hasUrls()){
+            if(MimeData->hasUrls()){
                 const QList<QUrl>& Urls = MimeData->urls();
-                const static QStringList SupportedFormats{
-                    ".BMP",
-                    ".GIF",
-                    ".JPG",
-                    ".JPEG",
-                    ".PNG",
-                    ".PBM",
-                    ".PGM",
-                    ".PPM",
-                    ".XBM",
-                    ".XPM"
-                };
-                bool ShouldBreak = false;
+                const QStringList& SupportedFormats = GetSupportedFormats();
                 for(const QUrl& Url : Urls){
                     const QString UrlString = Url.toDisplayString();
                     const QString UrlStringUpper = UrlString.toUpper();
                     for(const QString& Format : SupportedFormats){
                         if(UrlStringUpper.endsWith(Format)){
                             if(Url.isLocalFile()){
-                                // todo: save format
-//                                this->Format = Format;
-//                                this->Format.replace(".", "");
-                                SetImage(QImage(Url.toLocalFile()));
-                                ShouldBreak = true;
-                                break;
+                                return true;
                             }
                         }
                     }
-                    if(ShouldBreak)break;
                 }
             }
+            return false;
+        }
+
+        virtual void dropEvent(QGraphicsSceneDragDropEvent* Event) override{
+            auto MimeData = Event->mimeData();
+            SetImage(MimeData);
         }
 
         virtual QString GetTypeAsString() const override{
@@ -550,6 +661,28 @@ namespace Kim {
             QBuffer Buffer(&Array);
             Buffer.open(QIODevice::ReadOnly);
             Image.loadFromData(Array);
+        }
+
+        virtual void keyPressEvent(QKeyEvent* event)override{
+            // shift+enter open edit window
+            if(event->modifiers() & Qt::ShiftModifier && (event->key() == Qt::Key_Enter ||
+                    event->key() == Qt::Key_Return)){
+                emit EditSignal();
+                return;
+            }
+            // filter out ctrl & alt modifiers
+            if((event->modifiers() & Qt::ControlModifier)
+                    ||(event->modifiers() & Qt::AltModifier)){
+                if(event->modifiers() & Qt::ControlModifier){
+                    if(event->key() == Qt::Key_V){
+                        QClipboard* Clipboard = QApplication::clipboard();
+                        auto Data = Clipboard->mimeData();
+                        this->SetImage(Data);
+                        return;
+                    }
+                }
+            }
+            event->setAccepted(false);
         }
     };
 }

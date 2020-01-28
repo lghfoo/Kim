@@ -1,4 +1,4 @@
-    #pragma once
+﻿    #pragma once
 #include <QDialog>
 #include <QPushButton>
 #include <QTextEdit>
@@ -78,6 +78,12 @@ namespace Kim {
             GraphicsObject->scene()->removeItem(GraphicsObject);
             delete GraphicsObject;
         }
+
+        template<typename T>
+        T* GetItemView(){
+            return static_cast<T*>(GraphicsObject);
+        }
+
         KItemView* GetView() {
             return static_cast<KItemView*>(GraphicsObject);
         }
@@ -168,6 +174,10 @@ namespace Kim {
                 delete Dialog;
                 Dialog = nullptr;
             }
+        }
+
+        void AppendText(const QString& Text){
+            static_cast<KTextItemView*>(GraphicsObject)->AppendText(Text);
         }
     };
     //////////////////////////////// Image Item ////////////////////////////////

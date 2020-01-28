@@ -1,6 +1,8 @@
-#pragma once
+﻿#pragma once
 #include<QWidget>
 #include<QStackedLayout>
+#include <QProgressBar>
+#include <QMessageBox>
 #include"../view/CanvasWrapperView.hpp"
 #include"CanvasController.hpp"
 #include<QDockWidget>
@@ -51,6 +53,10 @@ namespace Kim {
                     &KCanvasController::LoadSignal,
                     this,
                     &KCanvasWrapperController::Load);
+            connect(View,
+                    &KCanvasWrapperView::SpecialInputSignal,
+                    CanvasController,
+                    &KCanvasController::OnSpecialInput);
         }
         QWidget* GetView(){
             return View;
@@ -61,6 +67,13 @@ namespace Kim {
 
         void SaveFileHelper(const QString& Filename){
             KTextSerializer Serializer;
+            connect(&Serializer,
+                    &KSerializer::FinishedSignal,
+                    []{
+                QMessageBox msgBox;
+                msgBox.setText("Saved.");
+                msgBox.exec();
+            });
             Serializer.Serialize(CanvasController, Filename);
         }
 

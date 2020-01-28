@@ -1,9 +1,11 @@
-#pragma once
+﻿#pragma once
 #include"../view/CanvasView.hpp"
 #include"../view/ItemView.hpp"
 #include"ItemController.hpp"
 #include"ConnectionController.hpp"
 #include"UnfoldViewController.hpp"
+#include <QApplication>
+#include <QClipboard>
 #include <QLinkedList>
 namespace Kim {
     class KTextSerializer;
@@ -92,6 +94,9 @@ namespace Kim {
                     break;
                 case Qt::Key_O:
                     emit LoadSignal();
+                    break;
+                case Qt::Key_V:
+                    OnRequestPaste();
                     break;
                 default:
                     break;
@@ -199,12 +204,32 @@ namespace Kim {
         }
 
         void OnSceneDrop(QGraphicsSceneDragDropEvent* Event){
-            if(SceneContext.DragingConnectionController){
+            auto Data = Event->mimeData();
+            // process image drop on scene
+            if(KImageItemView::HasImageData(Data)){
+                auto ScenePos = Event->scenePos();
+                auto Controller = this->AddImageItem(&ScenePos);
+                Controller->GetItemView<KImageItemView>()->SetImage(Data);
+            }
+            else if(KTextItemView::HasTextData(Data)){
+                auto ScenePos = Event->scenePos();
+                this->AddTextItem(&ScenePos)->GetItemView<KTextItemView>()->SetText(Data);
+            }
+            else if(SceneContext.DragingConnectionController){
                 auto TextItemController = CreateAndAddItemController(KTextItemView::Type);
                 auto Pos = SceneContext.DragingConnectionController->GetConnectionView()->GetTo();
                 TextItemController->GetView()->setPos(Pos);
                 SceneContext.DragingConnectionController->SetDstItemController(TextItemController);
                 SceneContext.DragingConnectionController = nullptr;
+            }
+        }
+
+        void OnSpecialInput(const QString& Text){
+            for(auto Item : this->SelectedControlleres){
+                if(Item->type() == KTextItemView::Type){
+                    static_cast<KTextItemController*>(Item)->AppendText(Text);
+                    break;
+                }
             }
         }
     public:
@@ -224,6 +249,17 @@ namespace Kim {
 
         KCanvasView* GetCanvasView(){
             return CanvasView;
+        }
+
+        void OnRequestPaste(){
+            QClipboard* Clipboard = QApplication::clipboard();
+            auto Data = Clipboard->mimeData();
+            if(KImageItemView::HasImageData(Data)){
+                AddImageItem()->GetItemView<KImageItemView>()->SetImage(Data);
+            }
+            else if(KTextItemView::HasTextData(Data)){
+                AddTextItem()->GetItemView<KTextItemView>()->SetText(Data);
+            }
         }
 
         void OnDeletePress(){
@@ -277,6 +313,10 @@ namespace Kim {
 
             auto DstItemController = ConnController->GetDstItemController();
             auto DstView = DstItemController->GetView();
+            // 取消选中状态，防止意外删除
+            if(DstView->isSelected()){
+                DstView->setSelected(false);
+            }
             this->Scene->removeItem(DstView);
 
             auto SrcItemController = ConnController->GetSrcItemController();
@@ -350,30 +390,40 @@ namespace Kim {
             return nullptr;
         }
 
-        void AddTextItem(){
+        KTextItemController* AddTextItem(const QPointF* const Position = nullptr){
             auto Controller = CreateItemController(KTextItemView::Type);
-            AddItem(Controller);
+            AddItem(Controller, Position);
             ItemControlleres.append(Controller);
+            return static_cast<KTextItemController*>(Controller);
         }
 
-        void AddImageItem(){
+        KImageItemController* AddImageItem(const QPointF* const Position = nullptr){
             auto Controller = CreateItemController(KImageItemView::Type);
-            AddItem(Controller);
+            AddItem(Controller, Position);
             ItemControlleres.append(Controller);
+            return static_cast<KImageItemController*>(Controller);
         }
 
-        void AddItem(KItemController* ItemController){
+        void AddItem(KItemController* ItemController,
+                     const QPointF* const Position = nullptr){
             QPointF Pos(0, 0);
-            switch (CanvasState.AddPosType) {
-            case KCanvasState::AtMouse:
-                break;
-            case KCanvasState::AtCursor:
-                Pos = Scene->GetCursorPos();
-                break;
-            case KCanvasState::AtNearest:
-                break;
-            default:
-                break;
+            if(Position){
+                Pos = *Position;
+            }
+            else{
+                switch (CanvasState.AddPosType) {
+                case KCanvasState::AtMouse:{
+                    Pos = CanvasView->mapToScene(CanvasView->mapFromGlobal(CanvasView->cursor().pos()));
+                    break;
+                }
+                case KCanvasState::AtCursor:
+                    Pos = Scene->GetCursorPos();
+                    break;
+                case KCanvasState::AtNearest:
+                    break;
+                default:
+                    break;
+                }
             }
             Scene->clearSelection();
             auto Item = ItemController->GetView();

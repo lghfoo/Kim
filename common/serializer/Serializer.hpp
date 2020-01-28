@@ -1,9 +1,14 @@
-#pragma once
+﻿#pragma once
 #include"../../controller/CanvasController.hpp"
 #include"../../controller/ItemController.hpp"
 #include"../../controller/ConnectionController.hpp"
 namespace Kim {
-    class KSerializer{
+    class KSerializer : public QObject{
+        Q_OBJECT
+    signals:
+        void TotalProgressSignal(int Total);
+        void ProgressSignal(int Current);
+        void FinishedSignal();
     public:
         /**
          * @brief Serialize

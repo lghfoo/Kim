@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include"Serializer.hpp"
 #include <QStack>
 #include <QTextCodec>
@@ -10,6 +10,9 @@ namespace Kim {
             bool NeedComma = false;
         };
         struct KContext : public KSavedContext{
+            KSerializer* CurrentSerializer = nullptr;
+            int CurrentProgress = 0;
+            int TotalProgress = 1;
             // For Serialize
             QStack<KSavedContext>ContextStack;
             // For Deserialize
@@ -49,6 +52,19 @@ namespace Kim {
             void Reset(){
                 this->Depth = 0;
                 this->NeedComma = false;
+                this->CurrentProgress = 0;
+                this->TotalProgress = 1;
+                this->CurrentSerializer = nullptr;
+                this->CurrentItemController = nullptr;
+                this->CurrentConnectionController = nullptr;
+                this->LineNumber = 1;
+                this->ColumnNumber = 1;
+                this->KeyToken = "";
+                this->ValueToken = "";
+                this->LastChar = '\0';
+                this->IsReadingValue = false;
+                this->IsReadingKey = false;
+                this->LastCharIsPlainBackslash = false;
                 ContextStack.clear();
             }
 
@@ -84,19 +100,31 @@ namespace Kim {
 #define END_ARRAY \
     Context.Restore();\
     StreamOut<<QString("%1]%2\n").arg(QString(Depth-1, '\t')).arg(Context.NeedComma? "," : "")
+#define PROGRESS_INC \
+Context.CurrentProgress++;\
+if(Context.CurrentSerializer){\
+    emit Context.CurrentSerializer->ProgressSignal(Context.CurrentProgress);\
+}
             static void SerializeCanvas(KCanvasController* CanvasController, QTextStream& StreamOut, KContext& Context){
                 BEGIN_OBJECT;
 
-                StreamOut << Prefix << "items: ";
                 const QList<KItemController*>& Items = CanvasController->ItemControlleres;
+                const QList<KConnectionController*>& Connections = CanvasController->ConnectionControlleres;
+                Context.TotalProgress = Items.size() + Connections.size();
+                if(Context.CurrentSerializer){
+                    emit Context.CurrentSerializer->TotalProgressSignal(Context.TotalProgress);
+                }
+                Context.CurrentProgress = 0;
+                StreamOut << Prefix << "items: ";
                 Context.NeedComma = true;
                 SerializeItems(Items, StreamOut, Context);
 
                 StreamOut << Prefix << "connections: ";
-                const QList<KConnectionController*>& Connections = CanvasController->ConnectionControlleres;
                 Context.NeedComma = false;
                 SerializeConnections(Connections, StreamOut, Context);
-
+                if(Context.CurrentSerializer){
+                    emit Context.CurrentSerializer->FinishedSignal();
+                }
                 END_OBJECT;
             }
 
@@ -144,6 +172,7 @@ namespace Kim {
                 else{
                     qDebug()<<"warning: skip null item.";
                 }
+                PROGRESS_INC
             }
 
 #define OUT(KEY, VALUE)\
@@ -167,6 +196,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                 OUT("To", Connection->GetDstItemController()->Identity);
 
                 END_OBJECT;
+                PROGRESS_INC
             }
 
             static void SerializeTextItem(KItemController* Item, QTextStream& StreamOut, KContext& Context){
@@ -394,7 +424,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                         else if(Char == '"'){
                             if(Context.ValueToken.isEmpty()){
                                 // pass
-                                qDebug()<<"warning: value token is empty"<<Context.DetailError(Char);
+//                                qDebug()<<"warning: value token is empty"<<Context.DetailError(Char);
                             }
                             if(!Context.KeyToken.isEmpty()){
                                 if(Context.CurrentItemController){
@@ -439,7 +469,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                                 }
                                 else{
                                     if(Context.KeyToken == "Type"){
-                                        qInfo()<<"info: creating controller of type: " + Context.ValueToken;
+//                                        qInfo()<<"info: creating controller of type: " + Context.ValueToken;
                                         if(Context.ValueToken == "TextItem"){
                                             Context.CurrentItemController = CanvasController
                                                     ->CreateAndAddItemController(KTextItemView::Type);
@@ -565,6 +595,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
     public:
         virtual void Serialize(KCanvasController* CanvasController, const QString& OutputPath) override{
             Context.Reset();
+            Context.CurrentSerializer = this;
             QFile OutputFile(OutputPath);
             if (OutputFile.open(QFile::WriteOnly | QFile::Truncate)) {
                 QTextStream OutStream(&OutputFile);
@@ -579,6 +610,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
 
         virtual void Deserialize(const QString& InputPath, KCanvasController* CanvasController) override{
             Context.Reset();
+            Context.CurrentSerializer = this;
             QFile InputFile(InputPath);
             if(InputFile.open(QFile::ReadOnly)){
                 QTextStream InStream(&InputFile);
