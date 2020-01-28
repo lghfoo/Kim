@@ -184,10 +184,23 @@ namespace Kim {
         void OnEndConnecting(KItemController* ItemController){
             if(SceneContext.DragingConnectionController){
                 if(ItemController){
+                    // can not connect self
+                    if(ItemController == SceneContext.DragingConnectionController->GetSrcItemController()){
+                        this->CancelConnecting();
+                        return;
+                    }
                     SceneContext.DragingConnectionController->SetDstItemController(ItemController);
                     SceneContext.DragingConnectionController = nullptr;
                 }
             }
+        }
+
+        void OnItemRequestSelectAllChildren(KItemController* ItemController, SelectionType Type){
+            SelectAllChildren(ItemController, Type);
+        }
+
+        void OnConnectionRequestSelectAllChildren(KConnectionController* ConnController, SelectionType Type){
+            SelectAllChildren(ConnController, Type);
         }
 
         void OnItemIgnoreDrop(KItemController* ItemController){
@@ -249,6 +262,58 @@ namespace Kim {
 
         KCanvasView* GetCanvasView(){
             return CanvasView;
+        }
+
+        // Children should be empty
+        void GetAllChildren(KItemController* ItemController, QSet<KItemController*>& Children){
+            auto Conns = this->GetConnectionsOfItem(ItemController);
+            if(Conns){
+                auto Iter = Conns->begin();
+                while(Iter != Conns->end()){
+                    if((*Iter)->GetSrcItemController() == ItemController){
+                        GetAllChildren(*Iter, Children);
+                    }
+                    ++Iter;
+                }
+            }
+        }
+
+        // Children should be empty
+        void GetAllChildren(KConnectionController* ConnController, QSet<KItemController*>& Children){
+            auto DstItem = ConnController->GetDstItemController();
+            if(!Children.contains(DstItem)){
+                Children.insert(DstItem);
+                GetAllChildren(DstItem, Children);
+            }
+        }
+
+        void SelectAllChildren(KItemController* ItemController, SelectionType Type){
+            QSet<KItemController*> Children = {};
+            GetAllChildren(ItemController, Children);
+            for(auto Child : Children){
+                if(Type == SelectionType::All)
+                    Child->GetView()->setSelected(true);
+                else if(Type == SelectionType::None)
+                    Child->GetView()->setSelected(false);
+                else if(Type == SelectionType::Reverse)
+                    Child->GetView()->setSelected(!Child->GetView()->isSelected());
+            }
+            // select item will change focus
+            ItemController->RequestFocus();
+        }
+
+        void SelectAllChildren(KConnectionController* ConnController, SelectionType Type){
+            QSet<KItemController*> Children = {};
+            GetAllChildren(ConnController, Children);
+            for(auto Child : Children){
+                if(Type == SelectionType::All)
+                    Child->GetView()->setSelected(true);
+                else if(Type == SelectionType::None)
+                    Child->GetView()->setSelected(false);
+                else if(Type == SelectionType::Reverse)
+                    Child->GetView()->setSelected(!Child->GetView()->isSelected());
+            }
+            ConnController->RequestFocus();
         }
 
         void OnRequestPaste(){
@@ -479,7 +544,8 @@ namespace Kim {
                     this, &KCanvasController::OnItemSelectedChanged);
             connect(Controller, &KItemController::RequestUnfoldSignal,
                     this, &KCanvasController::OnItemRequestUnfold);
-
+            connect(Controller, &KItemController::RequestSelectAllChildrenSignal,
+                    this, &KCanvasController::OnItemRequestSelectAllChildren);
             return Controller;
         }
 
@@ -504,6 +570,8 @@ namespace Kim {
                     this, &KCanvasController::OnConnectChanged);
             connect(Controller, &KConnectionController::FoldSignal,
                     this, &KCanvasController::OnConnectionFold);
+            connect(Controller, &KConnectionController::SelectedAllChildrenSignal,
+                    this, &KCanvasController::OnConnectionRequestSelectAllChildren);
             return Controller;
         }
 

@@ -30,6 +30,7 @@ namespace Kim {
         void PosChangedSignal(const QPointF& NewPow);
         void SizeChangedSignal(KItemController* Controller);
         void RequestUnfoldSignal(KItemController* Controller);
+        void RequestSelectAllChildrenSignal(KItemController* Controller, SelectionType);
     public slots:
         void EmitStartConnectingSignal(){
             emit StartConnectingSignal(this);
@@ -48,6 +49,9 @@ namespace Kim {
         }
         void EmitRquestUnfoldSignal(){
             emit RequestUnfoldSignal(this);
+        }
+        void EmitRequestSelectAllChildrenSignal(SelectionType Type){
+            emit RequestSelectAllChildrenSignal(this, Type);
         }
     public:
         KItemController(KItemView* ItemView):KGraphicsObjectController(ItemView){
@@ -73,6 +77,10 @@ namespace Kim {
                     &KItemView::SizeChangedSignal,
                     this,
                     &KItemController::EmitPosChangeSignal);
+            connect(ItemView,
+                    &KItemView::SelectedAllChildrenSignal,
+                    this,
+                    &KItemController::EmitRequestSelectAllChildrenSignal);
         }
         virtual ~KItemController(){
             GraphicsObject->scene()->removeItem(GraphicsObject);

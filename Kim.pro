@@ -25,6 +25,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 HEADERS += \
     common/DragDropProtocol.hpp \
     common/Math.hpp \
+    common/Utility.hpp \
     common/serializer/Serializer.hpp \
     common/serializer/TextSerializer.hpp \
     controller/ApplicationController.hpp \

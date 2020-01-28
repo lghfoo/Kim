@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include"ItemController.hpp"
 #include"../view/ConnectionView.hpp"
 #include<QGraphicsScene>
@@ -19,6 +19,7 @@ namespace Kim {
                               KItemController* OldItemController,
                               KItemController* NewItemController);
         void FoldSignal(KConnectionController*);
+        void SelectedAllChildrenSignal(KConnectionController*, SelectionType);
     public slots:
         void OnItemSizeChanged(KItemController* Controller){
             UpdateConnectionDecoration();
@@ -159,6 +160,12 @@ namespace Kim {
                     this,
                     [=]{
                 emit FoldSignal(this);
+            });
+            connect(View,
+                    &KConnectionView::SelectedAllChildrenSignal,
+                    this,
+                    [=](SelectionType Type){
+                emit SelectedAllChildrenSignal(this, Type);
             });
         }
         ~KConnectionController(){

@@ -20,6 +20,7 @@
 #include <QBuffer>
 #include<QApplication>
 #include <QClipboard>
+#include"../common/Utility.hpp"
 #include"GraphicsViewBase.hpp"
 namespace Kim {
     //////////////////////////////// Item View ////////////////////////////////
@@ -81,6 +82,7 @@ namespace Kim {
         void IgnoreDropSignal();
         void PosChangedSignal();
         void SizeChangedSignal();
+        void SelectedAllChildrenSignal(SelectionType);
     public:
         KItemView(){
             this->setAcceptDrops(true);
@@ -126,6 +128,25 @@ namespace Kim {
                 E->setAccepted(true);
                 emit EndDragDropSignal();
                 return true;
+            }
+            case QEvent::KeyPress:{
+                QKeyEvent* KeyEvent = static_cast<QKeyEvent*>(Event);
+                if(KeyEvent->key() == Qt::Key_L){
+                    KGraphicsViewBase::sceneEvent(Event);
+                    if(!Event->isAccepted()){
+                        if(KeyEvent->modifiers() & Qt::AltModifier){
+                            emit SelectedAllChildrenSignal(SelectionType::Reverse);
+                        }
+                        else if(KeyEvent->modifiers() & Qt::ShiftModifier){
+                            emit SelectedAllChildrenSignal(SelectionType::None);
+                        }
+                        else{
+                            emit SelectedAllChildrenSignal(SelectionType::All);
+                        }
+                        Event->setAccepted(true);
+                        return true;
+                    }
+                }
             }
             default:
                 break;

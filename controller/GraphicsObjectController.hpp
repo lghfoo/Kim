@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include<QGraphicsObject>
 #include"../view/GraphicsViewBase.hpp"
 namespace Kim {
@@ -17,6 +17,10 @@ namespace Kim {
                     [=](bool Selected){
                 emit SelectedChangedSignal(this, Selected);
             });
+        }
+
+        void RequestFocus(Qt::FocusReason Reason = Qt::NoFocusReason){
+            this->GraphicsObject->setFocus(Reason);
         }
 
         int type()const{

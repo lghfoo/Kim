@@ -1,10 +1,11 @@
-#pragma once
+﻿#pragma once
 #include<QGraphicsItem>
 #include <QPainter>
 #include<QGraphicsSceneDragDropEvent>
 #include <QKeyEvent>
 #include<QDebug>
 #include"GraphicsViewBase.hpp"
+#include"../common/Utility.hpp"
 namespace Kim {
     //////////////////////////////// Decoration ////////////////////////////////
     struct KDecoration{
@@ -83,6 +84,7 @@ namespace Kim {
         };
     signals:
         void FoldSignal();
+        void SelectedAllChildrenSignal(SelectionType);
     private:
         KShapeType ShapeType = Line;
         QPointF From;
@@ -118,6 +120,17 @@ namespace Kim {
                 auto KeyEvent = static_cast<QKeyEvent*>(Event);
                 if(KeyEvent->key() == Qt::Key_H){
                     emit FoldSignal();
+                }
+                else if(KeyEvent->key() == Qt::Key_L){
+                    if(KeyEvent->modifiers() & Qt::AltModifier){
+                        emit SelectedAllChildrenSignal(SelectionType::Reverse);
+                    }
+                    else if(KeyEvent->modifiers() & Qt::ShiftModifier){
+                        emit SelectedAllChildrenSignal(SelectionType::None);
+                    }
+                    else{
+                        emit SelectedAllChildrenSignal(SelectionType::All);
+                    }
                 }
                 break;
             }
