@@ -10,11 +10,13 @@ namespace Kim {
     static const QString IdentityTimeFormat = "yyyy_MM_dd_hh_mm_ss_zzz";
     static const QString NormalTimeFormat = "yyyy/MM/dd hh:mm:ss";
     class KTextSerializer;
+    class KDBSerializer;
     // TODO:
     // Modify signal
     class KItemController : public KGraphicsObjectController{
         Q_OBJECT
         friend class KTextSerializer;
+        friend class KDBSerializer;
     private:
         KFoldMark* ExpandMark = nullptr;
         KFoldMark* CollapseMark = nullptr;

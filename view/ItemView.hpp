@@ -709,6 +709,15 @@ namespace Kim {
             return Array.toBase64();
         }
 
+        QByteArray GetImageAsByteArray(){
+            QByteArray Array;
+            QBuffer Buffer(&Array);
+            Buffer.open(QIODevice::WriteOnly);
+            QString Format = this->Format.isEmpty()? "PNG" : this->Format;
+            Image.save(&Buffer, Format.toStdString().c_str());
+            return Array;
+        }
+
         virtual void SetContent(const QString& Content)override{
             QByteArray Array = QByteArray::fromBase64(Content.toUtf8());
             QBuffer Buffer(&Array);

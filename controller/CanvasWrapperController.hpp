@@ -7,6 +7,7 @@
 #include"CanvasController.hpp"
 #include<QDockWidget>
 #include"../common/serializer/TextSerializer.hpp"
+#include"../common/serializer/DBSerializer.hpp"
 namespace Kim {
     class KCanvasWrapperController : public QObject{
         Q_OBJECT
@@ -66,7 +67,7 @@ namespace Kim {
         }
 
         void SaveFileHelper(const QString& Filename){
-            KTextSerializer Serializer;
+            KDBSerializer Serializer;
             connect(&Serializer,
                     &KSerializer::FinishedSignal,
                     []{
@@ -78,7 +79,7 @@ namespace Kim {
         }
 
         void LoadFileHelper(const QString& Filename){
-            KTextSerializer Serilizer;
+            KDBSerializer Serilizer;
             Serilizer.Deserialize(Filename, CanvasController);
         }
 

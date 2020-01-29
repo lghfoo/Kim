@@ -26,7 +26,7 @@ namespace Kim {
         static QLinkedList<KGreeceLetter>& GetAlphabet(){
             static QLinkedList<KGreeceLetter> Alphabet = {};
             if(Alphabet.empty()){
-                QFile File(":/text/GreeceAlphabet.txt");
+                QFile File(":/resources/GreeceAlphabet.txt");
                 if(File.open(QIODevice::ReadOnly | QIODevice::Text)){
                     QTextStream Stream(&File);
                     Stream.setCodec("utf-8");

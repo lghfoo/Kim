@@ -10,9 +10,11 @@
 #include <QMessageBox>
 namespace Kim {
     class KTextSerializer;
+    class KDBSerializer;
     class KCanvasController : public QObject{
         Q_OBJECT
         friend class KTextSerializer;
+        friend class KDBSerializer;
     public:
         struct KSceneContext{
             KConnectionController* DragingConnectionController = nullptr;

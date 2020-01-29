@@ -1,5 +1,5 @@
-QT += gui widgets
-
+QT       += core gui sql
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 CONFIG += c++11 console
 CONFIG -= app_bundle
 
@@ -26,6 +26,7 @@ HEADERS += \
     common/DragDropProtocol.hpp \
     common/Math.hpp \
     common/Utility.hpp \
+    common/serializer/DBSerializer.hpp \
     common/serializer/Serializer.hpp \
     common/serializer/TextSerializer.hpp \
     controller/ApplicationController.hpp \
