@@ -13,7 +13,8 @@ namespace Kim {
          * @brief FoldCount
          * use to record the fold state of the item
          */
-        int FoldCount = 0;
+//        int FoldCount = 0;
+        bool Collapsed = false;
     signals:
         void ConnectChangedSignal(KConnectionController* ConnectionController,
                               KItemController* OldItemController,
@@ -169,6 +170,9 @@ namespace Kim {
             });
         }
         ~KConnectionController(){
+            if(SrcItemController){
+                SrcItemController->SetOutConnectionCount(SrcItemController->GetOutConnectionCount() - 1);
+            }
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
             if(ConnectionView->scene()){
                 ConnectionView->scene()->removeItem(ConnectionView);
@@ -176,16 +180,24 @@ namespace Kim {
             delete ConnectionView;
         }
 
-        bool IsFolded()const{
-            return FoldCount > 0;
+//        bool IsFolded()const{
+//            return FoldCount > 0;
+//        }
+
+//        void SetFoldCount(int FoldCnt){
+//            this->FoldCount = FoldCnt;
+//        }
+
+//        int GetFoldCount()const{
+//            return FoldCount;
+//        }
+
+        bool IsCollapsed(){
+            return Collapsed;
         }
 
-        void SetFoldCount(int FoldCnt){
-            this->FoldCount = FoldCnt;
-        }
-
-        int GetFoldCount()const{
-            return FoldCount;
+        void SetCollapsed(bool Collapsed){
+            this->Collapsed = Collapsed;
         }
 
         void SetSrcItemController(KItemController* ItemController){
@@ -208,6 +220,7 @@ namespace Kim {
                             &KItemController::SizeChangedSignal,
                             this,
                             &KConnectionController::OnItemSizeChanged);
+                SrcItemController->SetOutConnectionCount(SrcItemController->GetOutConnectionCount() + 1);
             }
             emit ConnectChangedSignal(this, OldController, SrcItemController);
         }

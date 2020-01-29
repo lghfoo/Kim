@@ -26,16 +26,35 @@ namespace Kim {
     //////////////////////////////// Item View ////////////////////////////////
     class KFoldMark : public QGraphicsObject{
         Q_OBJECT
+    public:
+        enum KMarkShpae{Plus, Minus};
     signals:
         void ClickedSignal();
     private:
         qreal Radius = 10.0;
-        qreal PlusRaidus = Radius * 0.4;
+        qreal ShapeRadius = Radius * 0.4;
+        KMarkShpae MarkShape = Plus;
     protected:
         virtual void mousePressEvent(QGraphicsSceneMouseEvent* Event)override{
+            // 必须在clicked signal之前ungrab mouse，
+            // 因为可能在signal后this已经被delete了
+            this->ungrabMouse();
             emit ClickedSignal();
         }
     public:
+        KFoldMark(KMarkShpae MarkShape = Plus) : MarkShape(MarkShape){
+
+        }
+
+        void SetRadius(qreal Radius){
+            this->Radius = Radius;
+            this->ShapeRadius = Radius * 0.4;
+        }
+
+        void SetMarkShape(KMarkShpae MarkShape){
+            this->MarkShape = MarkShape;
+        }
+
         virtual void paint(QPainter* Painter,
                    const QStyleOptionGraphicsItem* Options,
                    QWidget* Widget = nullptr)override{
@@ -50,12 +69,21 @@ namespace Kim {
             Painter->fillPath(Path, Qt::white);
             Painter->drawEllipse(Bounding);
             const auto& Center = Bounding.center();
-            QLineF HLine = {Center - QPointF{PlusRaidus, 0},
-                            Center + QPointF{PlusRaidus, 0}};
-            QLineF VLine = {Center - QPointF{0, PlusRaidus},
-                            Center + QPointF{0, PlusRaidus}};
-            Painter->drawLine(HLine);
-            Painter->drawLine(VLine);
+            switch (MarkShape) {
+            case Plus:{
+                QLineF VLine = {Center - QPointF{0, ShapeRadius},
+                                Center + QPointF{0, ShapeRadius}};
+                Painter->drawLine(VLine);
+                // do not break;
+            }
+            case Minus:{
+                QLineF HLine = {Center - QPointF{ShapeRadius, 0},
+                                Center + QPointF{ShapeRadius, 0}};
+                Painter->drawLine(HLine);
+                break;
+            }
+            }
+
         }
 
         QRectF GetBounding()const{
@@ -93,8 +121,12 @@ namespace Kim {
         virtual void SetContent(const QString& Content) {Q_UNUSED(Content)}
         virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
             if(change == QGraphicsItem::GraphicsItemChange::ItemPositionHasChanged){
+//                qDebug()<<"now"<<this->pos()<<"new"<<value;
                 emit PosChangedSignal();
             }
+//            else if(change == QGraphicsItem::GraphicsItemChange::ItemPositionChange){
+////                qDebug()<<"now"<<this->pos()<<"new"<<value;
+//            }
             else if(change == QGraphicsItem::GraphicsItemChange::ItemSelectedHasChanged){
                 if(this->isSelected()){
                     this->setFocus(Qt::FocusReason::NoFocusReason);

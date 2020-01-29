@@ -9,6 +9,34 @@ int main(int argc, char *argv[])
     return a.exec();
 }
 
+// 2020/1/29 11:02
+// Done:
+// 30、解决弹出模态框并关闭之后移动item会出现选框的bug:在emit之后ungrab mouse
+// 12、+/-折叠
+// 7、节点折叠处理循环、重复、多个src、以及相对位置
+// 18、折叠节点所有连接
+// TODO:
+// 30、group节点
+// 13、序列化，添加对折叠的处理
+// 22、添加数据库Serializer
+// 28、多场景管理
+// 30、节点引用场景
+// 5、group选中的connection
+// 8、scroll到指点item
+// 10、connection支持文本输入
+// 11、工具面板
+// 15、修复Item缩放时场景像素残留bug
+// 16、ImageItem Format
+// 17、Text item cache bounding
+// 21、重构Serializer
+// 23、重构Mime
+// 24、复制、剪切节点、连接
+// 25、connection属性面板
+// 26、item属性面板
+// 27、使用lz4压缩图片数据
+// 29、焦点管理并更新选择孩子操作（现在是从item和connection发出signal来进行选择，期望改成从canvs的keyPress事件中根据焦点进行选择）
+// 31、snap to grid
+
 // 2020/1/28 16:51
 // Done:
 // 1、添加帮助界面
@@ -25,6 +53,9 @@ int main(int argc, char *argv[])
 // 7、节点折叠处理循环、重复、多个src、以及相对位置
 // 18、折叠节点所有连接
 // 13、序列化，添加对折叠的处理
+// 22、添加数据库Serializer
+// 28、多场景管理
+// 30、节点引用场景
 // 5、group选中的connection
 // 8、scroll到指点item
 // 10、connection支持文本输入
@@ -32,13 +63,13 @@ int main(int argc, char *argv[])
 // 15、修复Item缩放时场景像素残留bug
 // 16、ImageItem Format
 // 17、Text item cache bounding
-// 25、焦点管理并更新选择孩子操作
 // 21、重构Serializer
-// 22、添加数据库Serializer
 // 23、重构Mime
 // 24、复制、剪切节点、连接
 // 25、connection属性面板
 // 26、item属性面板
+// 27、使用lz4压缩图片数据
+// 29、焦点管理并更新选择孩子操作（现在是从item和connection发出signal来进行选择，期望改成从canvs的keyPress事件中根据焦点进行选择）
 
 // 2020/1/27 18:33
 // Done:

@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QLinkedList>
+#include <QMessageBox>
 namespace Kim {
     class KTextSerializer;
     class KCanvasController : public QObject{
@@ -60,15 +61,24 @@ namespace Kim {
                 SetWriteDirect(false);
             }
         };
+//        struct KCollapseCollection{
+//            struct KCollapse{
+//                QLinkedList<KItemController*>CollapsedItem = {};
+//                QPointF ParentPosWhenCollapse = {};
+//            };
+//            QLinkedList<KCollapse>Collection = {};
+//        };
+//        using KCollapse = KCollapseCollection::KCollapse;
     private:
         KCanvasState CanvasState;
         KCanvasView* CanvasView = new KCanvasView;
         KScene* Scene = CanvasView->GetScene();
         KSceneContext SceneContext;
-        QList<KItemController*>ItemControlleres;
-        QList<KConnectionController*>ConnectionControlleres;
-        QLinkedList<KGraphicsObjectController*>SelectedControlleres;
-        QMap<KItemController*, QLinkedList<KConnectionController*>> ItemConnections;
+        QList<KItemController*>ItemControlleres = {};
+        QList<KConnectionController*>ConnectionControlleres = {};
+        QLinkedList<KGraphicsObjectController*>SelectedControlleres = {};
+        QMap<KItemController*, QLinkedList<KConnectionController*>> ItemConnections = {};
+//        QMap<KItemController*, KCollapseCollection>ItemCollapse = {};
     signals:
         void SaveSingal();
         void SaveAsSignal();
@@ -316,6 +326,85 @@ namespace Kim {
             ConnController->RequestFocus();
         }
 
+        bool HasConnectionOutsideChildren(KItemController* Controller){
+            QSet<KItemController*>Children{};
+            GetAllChildren(Controller, Children);
+            for(auto Child : Children){
+                auto Conns = GetConnectionsOfItem(Child);
+                auto Iter = Conns->begin();
+                while(Iter != Conns->end()){
+                    auto Conn = *Iter;
+                    auto SrcItem = Conn->GetSrcItemController();
+                    // the the src item is not the controller and
+                    // if there is a connection between
+                    // item outside the children and the child
+                    // then, the item is not collapseable
+                    if(SrcItem != Controller && !Children.contains(SrcItem)){
+                        return true;
+                    }
+                    ++Iter;
+                }
+            }
+            return false;
+        }
+
+        bool HasCircuitInChildrenHelper(KItemController* Controller, QSet<KItemController*>& Visited){
+            if(Visited.contains(Controller))return  true;
+            Visited.insert(Controller);
+            auto Conns = GetConnectionsOfItem(Controller);
+            if(!Conns)return false;
+            auto Iter = Conns->begin();
+            bool Result = false;
+            while(Iter != Conns->end()){
+                if((*Iter)->GetSrcItemController() == Controller){
+                    Result = Result || HasCircuitInChildrenHelper((*Iter)->GetDstItemController(), Visited);
+                    if(Result)return true;
+                }
+                ++Iter;
+            }
+            return false;
+        }
+
+        // 孩子中是否有环，孩子不包括最原始的item
+        bool HasCircuitInChildren(KItemController* Controller){
+            QSet<KItemController*>Visited{};
+            return HasCircuitInChildrenHelper(Controller, Visited);
+        }
+
+        bool IsTreeRoot(KItemController* Contrller){
+            return true;
+        }
+
+        // 只有是树状才能折叠
+        bool IsCollapseable(KItemController* Controller){
+//            return !HasCircuitInChildren(Controller) && !HasConnectionOutsideChildren(Controller);
+            // 1、不能有环路
+            if(HasCircuitInChildren(Controller))return false;
+//            qDebug()<<"not curcuit";
+            // 2、item的入度不能大于1
+            QSet<KItemController*>Children{};
+            GetAllChildren(Controller, Children);
+            for(auto Item : Children){
+                // 只要有一个item的入度大于1就不是树
+                if(GetInConnectionOfItem(Item).size() > 1){
+                    return false;
+                }
+            }
+//            qDebug()<<"not out degree > 1";
+            // 3、孩子不能与原始item有连接
+            for(auto Item : Children){
+                const auto& OutConns = GetOutConnectionOfItem(Item);
+                for(auto OutConn : OutConns){
+                    if(OutConn->GetDstItemController() == Controller){
+                        return false;
+                    }
+                }
+            }
+//            qDebug()<<"not connect to root";
+            return true;
+        }
+
+
         void OnRequestPaste(){
             QClipboard* Clipboard = QApplication::clipboard();
             auto Data = Clipboard->mimeData();
@@ -367,7 +456,8 @@ namespace Kim {
             }
         }
 
-        void FoldConnection(KConnectionController* ConnController){
+        //////////////////////////////// Collapse & Expand ////////////////////////////////
+/*        void CollapseConnection(KConnectionController* ConnController){
             bool IsFolded = ConnController->IsFolded();
             // 更新折叠计数
             ConnController->SetFoldCount(ConnController->GetFoldCount() + 1);
@@ -395,14 +485,14 @@ namespace Kim {
                 while (Iter!=DstConns->end()) {
                     // avoid dead loop
                     if(*Iter != ConnController){
-                        FoldConnection(*Iter);
+                        CollapseConnection(*Iter);
                     }
                     Iter++;
                 }
             }
         }
 
-        void UnfoldConnection(KConnectionController* ConnController){
+        void ExpandConnection(KConnectionController* ConnController){
             ConnController->SetFoldCount(ConnController->GetFoldCount() - 1);
             if(ConnController->GetFoldCount() > 0)return;
             this->Scene->addItem(ConnController->GetConnectionView());
@@ -418,7 +508,7 @@ namespace Kim {
                 auto Iter = DstConns->begin();
                 while(Iter != DstConns->end()){
                     if(*Iter != ConnController){
-                        UnfoldConnection(*Iter);
+                        ExpandConnection(*Iter);
                     }
                     Iter++;
                 }
@@ -426,10 +516,10 @@ namespace Kim {
         }
 
         void OnConnectionFold(KConnectionController* ConnController){
-            FoldConnection(ConnController);
+            CollapseConnection(ConnController);
         }
 
-        void OnItemRequestUnfold(KItemController* ItemController){
+        void OnItemRequestSelectlyExpand(KItemController* ItemController){
             KUnfoldViewController* UnfoldController = new KUnfoldViewController(ItemController, ItemConnections);
             connect(UnfoldController,
                     &KUnfoldViewController::RequestUnfoldConnectionSignal,
@@ -438,12 +528,150 @@ namespace Kim {
             UnfoldController->Show();
         }
 
+        void OnItemRequestExpand(KItemController* ItemController){
+        }
+
+
+        void OnItemRequestCollapseHelper(KItemController* ItemController,
+                                         QSet<KItemController*> Visited){
+            Visited.insert(ItemController);
+            auto Conns = this->GetConnectionsOfItem(ItemController);
+            if(Conns){
+                auto Iter = Conns->begin();
+                int Cnt = 0;
+                while(Iter!=Conns->end()){
+                    if((*Iter)->GetSrcItemController() == ItemController){
+                        ++Cnt;
+                        auto DstItem = (*Iter)->GetDstItemController();
+                        if(!Visited.contains(DstItem)){
+                            OnItemRequestCollapseHelper(DstItem, Visited);
+                        }
+                        else{
+                            // 环
+                        }
+                        ++Iter;
+                    }
+                }
+                ItemController->SetFoldConnectionCount(Cnt);
+            }
+
+
+        }
+
+        bool IsCollapseable(KItemController* ItemController){
+            QSet<KItemController*>Children{};
+            GetAllChildren(ItemController, Children);
+            for(auto Child : Children){
+                auto Conns = GetConnectionsOfItem(Child);
+                auto Iter = Conns->begin();
+                while(Iter != Conns->end()){
+                    // if there is a connection between
+                    // item outside the children and the child
+                    // then, the item is not collapseable
+                    if(!Children.contains((*Iter)->GetSrcItemController())){
+                        return false;
+                    }
+                    ++Iter;
+                }
+            }
+            return true;
+        }
+
+        void OnItemRequestCollapse(KItemController* ItemController){
+            if(IsCollapseable(ItemController)){
+                QSet<KItemController*>Visited{};
+                OnItemRequestCollapseHelper(ItemController, Visited);
+            }
+        }
+
         void OnRequestUnfoldConnections(const QLinkedList<KConnectionController*>&
                                         Connections){
             for(auto Connection : Connections){
-                UnfoldConnection(Connection);
+                ExpandConnection(Connection);
             }
         }
+*/
+        //////////////////////////////// Expand ////////////////////////////////
+        void ExpandItemHelper(KItemController* Controller,
+                              bool Recursively = false){
+            auto Conns = GetConnectionsOfItem(Controller);
+            if(!Conns)return;
+            auto Iter = Conns->begin();
+            while(Iter != Conns->end()){
+                auto Conn = *Iter;
+                auto SrcItem = Conn->GetSrcItemController();
+                auto DstItem = Conn->GetDstItemController();
+                if(SrcItem == Controller && DstItem->IsCollapsed()){
+//                    Scene->addItem(DstItem->GetView());
+//                    Scene->addItem(Conn->GetConnectionView());
+                    Conn->GetConnectionView()->setVisible(true);
+                    Conn->SetCollapsed(false);
+                    DstItem->GetView()->setVisible(true);
+                    DstItem->SetCollapsed(false);
+                    auto NewParentPos = Controller->GetView()->pos();
+                    auto OldParentPos = DstItem->GetParentPosWhenCollapse();
+                    auto DPos = NewParentPos - OldParentPos;
+                    DstItem->GetView()->moveBy(DPos.x(), DPos.y());
+                    Controller->SetFoldConnectionCount(Controller->GetFoldConnectionCount() - 1);
+                    if(Recursively){
+                        ExpandItemHelper(Controller);
+                    }
+                }
+                ++Iter;
+            }
+        }
+
+        void OnItemRequestExpand(KItemController* Controller){
+            ExpandItemHelper(Controller);
+        }
+        //////////////////////////////// Collapse ////////////////////////////////
+        void CollapseItemHelper(KItemController* Controller,
+                                KItemController* Root){
+            const auto& OutConns = GetOutConnectionOfItem(Controller);
+            if(OutConns.isEmpty())return;
+            auto Iter = OutConns.begin();
+            while(Iter != OutConns.end()){
+                auto Conn = *Iter;
+                if(!Conn->IsCollapsed()){
+//                    qDebug()<<"conn is not coll";
+                    if(Conn->IsSelected())
+                        Conn->SetSelected(false);
+//                    Scene->removeItem(Conn->GetConnectionView());
+//                    Conn->GetConnectionView()->setParentItem(Root->GetView());
+                    Conn->GetConnectionView()->setVisible(false);
+                    Conn->SetCollapsed(true);
+                    Controller->SetFoldConnectionCount(Controller->GetFoldConnectionCount() + 1);
+
+                    auto DstItem = Conn->GetDstItemController();
+                    if(!DstItem->IsCollapsed()){
+//                        qDebug()<<"dst is not coll";
+                        if(DstItem->IsSelected())
+                            DstItem->SetSelected(false);
+//                        Scene->removeItem(DstItem->GetView());
+//                        DstItem->GetView()->setParentItem(Root->GetView());
+                        DstItem->GetView()->setVisible(false);
+                        DstItem->SetParentPosWhenCollapse(Controller->GetView()->pos());
+                        DstItem->SetCollapsed(true);
+                        CollapseItemHelper(DstItem, Root);
+                    }
+                }
+                ++Iter;
+            }
+        }
+
+
+
+        void OnItemRequestCollapse(KItemController* Controller){
+            QSet<KItemController*>Children{};
+            if(!IsCollapseable(Controller)){
+                QMessageBox Box;
+                Box.setText("Fail to collapse: need the form of tree.");
+                Box.exec();
+                return;
+            }
+            CollapseItemHelper(Controller, Controller);
+        }
+        //////////////////////////////// Collapse & Expand ////////////////////////////////
 
         QLinkedList<KConnectionController*>* GetConnectionsOfItem(KItemController* Controller){
             if(Controller){
@@ -453,6 +681,42 @@ namespace Kim {
                 }
             }
             return nullptr;
+        }
+
+        QLinkedList<KConnectionController*> GetOutConnectionOfItem(KItemController* Controller){
+            QLinkedList<KConnectionController*> OutConns{};
+            if(Controller){
+                auto It = ItemConnections.find(Controller);
+                if(It != ItemConnections.end()){
+                    const auto& Conns = *It;
+//                    qDebug()<<"get out";
+//                    qDebug()<<Conns.size();
+                    for(auto Conn : Conns){
+//                        qDebug()<<"for "<<Conn;
+//                        qDebug()<<"is out"<<(Conn->GetSrcItemController() == Controller);
+                        if(Conn->GetSrcItemController() == Controller){
+                            OutConns.append(Conn);
+                        }
+                    }
+                }
+            }
+            return OutConns;
+        }
+
+        QLinkedList<KConnectionController*> GetInConnectionOfItem(KItemController* Controller){
+            QLinkedList<KConnectionController*> InConns{};
+            if(Controller){
+                auto It = ItemConnections.find(Controller);
+                if(It != ItemConnections.end()){
+                    const auto& Conns = *It;
+                    for(auto Conn : Conns){
+                        if(Conn->GetDstItemController() == Controller){
+                            InConns.append(Conn);
+                        }
+                    }
+                }
+            }
+            return InConns;
         }
 
         KTextItemController* AddTextItem(const QPointF* const Position = nullptr){
@@ -542,10 +806,12 @@ namespace Kim {
                     this, &KCanvasController::OnItemIgnoreDrop);
             connect(Controller, &KGraphicsObjectController::SelectedChangedSignal,
                     this, &KCanvasController::OnItemSelectedChanged);
-            connect(Controller, &KItemController::RequestUnfoldSignal,
-                    this, &KCanvasController::OnItemRequestUnfold);
             connect(Controller, &KItemController::RequestSelectAllChildrenSignal,
                     this, &KCanvasController::OnItemRequestSelectAllChildren);
+            connect(Controller, &KItemController::RequestExpandSignal,
+                    this, &KCanvasController::OnItemRequestExpand);
+            connect(Controller, &KItemController::RequestCollapseSignal,
+                    this, &KCanvasController::OnItemRequestCollapse);
             return Controller;
         }
 
@@ -568,10 +834,10 @@ namespace Kim {
                     this, &KCanvasController::OnItemSelectedChanged);
             connect(Controller, &KConnectionController::ConnectChangedSignal,
                     this, &KCanvasController::OnConnectChanged);
-            connect(Controller, &KConnectionController::FoldSignal,
-                    this, &KCanvasController::OnConnectionFold);
             connect(Controller, &KConnectionController::SelectedAllChildrenSignal,
                     this, &KCanvasController::OnConnectionRequestSelectAllChildren);
+//            connect(Controller, &KConnectionController::FoldSignal,
+//                    this, &KCanvasController::OnConnectionFold);
             return Controller;
         }
 
@@ -607,6 +873,7 @@ namespace Kim {
             }
         }
 
+        // when delete item, always delete connection first.
         void DeleteItem(KItemController* Controller){
             ItemControlleres.removeOne(static_cast<KItemController*>(Controller));
             if(Controller->IsSelected()){
