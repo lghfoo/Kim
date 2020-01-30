@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include"../view/MainView.hpp"
 #include"CanvasWrapperController.hpp"
 namespace Kim {

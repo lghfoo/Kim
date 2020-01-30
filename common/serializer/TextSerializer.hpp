@@ -429,7 +429,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                             if(!Context.KeyToken.isEmpty()){
                                 if(Context.CurrentItemController){
                                     if(Context.KeyToken == "Identity"){
-                                        Context.CurrentItemController->Identity = Context.ValueToken;
+                                        Context.CurrentItemController->Identity = Context.ValueToken.toLongLong();
                                     }
                                     else if(Context.KeyToken == "Alias"){
                                         Context.CurrentItemController->Alias = Context.ValueToken;
@@ -547,7 +547,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                             }
                             else if(!Context.ValueToken.isEmpty()){
                                 auto ItemController = CanvasController
-                                        ->GetItemByIdentity(Context.ValueToken);
+                                        ->GetItemByIdentity(Context.ValueToken.toLongLong());
                                 if(!ItemController){
                                     qWarning()<<"warning: can not find item controller: " + Context.ValueToken;
                                 }

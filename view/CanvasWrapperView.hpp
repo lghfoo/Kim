@@ -13,6 +13,10 @@ namespace Kim {
         friend class KCanvasWrapperController;
     signals:
         void SpecialInputSignal(const QString& Text);
+        void SaveCanvasSignal();
+        void LoadCanvasSignal();
+        void GroupToTextItem();
+        void GroupToImageItem();
     private:
         QWidget* ToolWidget = new QWidget;
         KCanvasView* CanvasView = nullptr;
@@ -34,22 +38,40 @@ namespace Kim {
             QLayout* ToolLayout = new QVBoxLayout;
             ToolWidget->setLayout(ToolLayout);
             QPushButton* ShowHelpBtn = new QPushButton(tr("Help"));
+            QPushButton* ShowSpecialInputBtn = new QPushButton(tr("Special Input"));
+            QPushButton* LoadCanvasBtn = new QPushButton(tr("Load Canvas"));
+            QPushButton* SaveCanvasBtn = new QPushButton(tr("Save Canvas"));
+            QPushButton* GroupToTextBtn = new QPushButton(tr("Group To Text"));
             connect(ShowHelpBtn,
                     &QPushButton::clicked,
                     [=]{
                 HelpView->setWindowFlag(Qt::WindowStaysOnTopHint);
                 HelpView->show();
             });
-            QPushButton* ShowSpecialInputBtn = new QPushButton(tr("Special Input"));
             connect(ShowSpecialInputBtn,
                     &QPushButton::clicked,
                     [=]{
                 SpecialInputView->setWindowFlag(Qt::WindowStaysOnTopHint);
                 SpecialInputView->show();
             });
+            connect(LoadCanvasBtn,
+                    &QPushButton::clicked,
+                    this,
+                    &KCanvasWrapperView::LoadCanvasSignal);
+            connect(SaveCanvasBtn,
+                    &QPushButton::clicked,
+                    this,
+                    &KCanvasWrapperView::SaveCanvasSignal);
+            connect(GroupToTextBtn,
+                    &QPushButton::clicked,
+                    this,
+                    &KCanvasWrapperView::GroupToTextItem);
 
             ToolLayout->addWidget(ShowHelpBtn);
             ToolLayout->addWidget(ShowSpecialInputBtn);
+            ToolLayout->addWidget(LoadCanvasBtn);
+            ToolLayout->addWidget(SaveCanvasBtn);
+            ToolLayout->addWidget(GroupToTextBtn);
             ToolLayout->setAlignment(Qt::AlignTop);
 
             connect(SpecialInputView,

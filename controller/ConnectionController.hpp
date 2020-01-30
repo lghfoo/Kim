@@ -13,7 +13,7 @@ namespace Kim {
          * @brief FoldCount
          * use to record the fold state of the item
          */
-//        int FoldCount = 0;
+        // need serialize
         bool Collapsed = false;
     signals:
         void ConnectChangedSignal(KConnectionController* ConnectionController,
@@ -21,6 +21,7 @@ namespace Kim {
                               KItemController* NewItemController);
         void FoldSignal(KConnectionController*);
         void SelectedAllChildrenSignal(KConnectionController*, SelectionType);
+        void DestroyedSignal(KConnectionController* Controller);
     public slots:
         void OnItemSizeChanged(KItemController* Controller){
             UpdateConnectionDecoration();
@@ -169,9 +170,13 @@ namespace Kim {
                 emit SelectedAllChildrenSignal(this, Type);
             });
         }
-        ~KConnectionController(){
+        virtual ~KConnectionController() override{
+            emit DestroyedSignal(this);
             if(SrcItemController){
-                SrcItemController->SetOutConnectionCount(SrcItemController->GetOutConnectionCount() - 1);
+                SrcItemController->OutConnections.removeOne(this);
+            }
+            if(DstItemController){
+                DstItemController->InConnections.removeOne(this);
             }
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
             if(ConnectionView->scene()){
@@ -180,28 +185,20 @@ namespace Kim {
             delete ConnectionView;
         }
 
-//        bool IsFolded()const{
-//            return FoldCount > 0;
-//        }
-
-//        void SetFoldCount(int FoldCnt){
-//            this->FoldCount = FoldCnt;
-//        }
-
-//        int GetFoldCount()const{
-//            return FoldCount;
-//        }
-
         bool IsCollapsed(){
             return Collapsed;
         }
 
         void SetCollapsed(bool Collapsed){
             this->Collapsed = Collapsed;
+            this->GraphicsObject->setVisible(!Collapsed);
         }
 
         void SetSrcItemController(KItemController* ItemController){
             auto OldController = SrcItemController;
+            if(OldController){
+                OldController->OutConnections.removeOne(this);
+            }
             SrcItemController = ItemController;
             if(SrcItemController){
                 auto Pos = SrcItemController->GetView()->pos();
@@ -220,12 +217,16 @@ namespace Kim {
                             &KItemController::SizeChangedSignal,
                             this,
                             &KConnectionController::OnItemSizeChanged);
-                SrcItemController->SetOutConnectionCount(SrcItemController->GetOutConnectionCount() + 1);
+                SrcItemController->OutConnections.append(this);
+                SrcItemController->UpdateMark();
             }
             emit ConnectChangedSignal(this, OldController, SrcItemController);
         }
         void SetDstItemController(KItemController* ItemController){
             auto OldController = DstItemController;
+            if(OldController){
+                OldController->InConnections.removeOne(this);
+            }
             DstItemController = ItemController;
             if(DstItemController){
                 UpdateDstPosition(DstItemController->GetView()->pos());
@@ -239,6 +240,7 @@ namespace Kim {
                             &KItemController::SizeChangedSignal,
                             this,
                             &KConnectionController::OnItemSizeChanged);
+                DstItemController->InConnections.append(this);
             }
             emit ConnectChangedSignal(this, OldController, DstItemController);
         }

@@ -24,10 +24,10 @@
 #include"GraphicsViewBase.hpp"
 namespace Kim {
     //////////////////////////////// Item View ////////////////////////////////
-    class KFoldMark : public QGraphicsObject{
+    class KItemMark : public QGraphicsObject{
         Q_OBJECT
     public:
-        enum KMarkShpae{Plus, Minus};
+        enum KMarkShpae{Plus, Minus, Ellipse};
     signals:
         void ClickedSignal();
     private:
@@ -42,8 +42,11 @@ namespace Kim {
             emit ClickedSignal();
         }
     public:
-        KFoldMark(KMarkShpae MarkShape = Plus) : MarkShape(MarkShape){
+        KItemMark(KMarkShpae MarkShape = Plus) : MarkShape(MarkShape){
 
+        }
+
+        virtual ~KItemMark() override{
         }
 
         void SetRadius(qreal Radius){
@@ -80,6 +83,14 @@ namespace Kim {
                 QLineF HLine = {Center - QPointF{ShapeRadius, 0},
                                 Center + QPointF{ShapeRadius, 0}};
                 Painter->drawLine(HLine);
+                break;
+            }
+            case Ellipse:{
+                QPointF LeftTop = Center - QPointF{ShapeRadius, ShapeRadius};
+                QPainterPath EllipsePath;
+                EllipsePath.moveTo(LeftTop);
+                EllipsePath.addEllipse(QRectF(LeftTop.x(), LeftTop.y(), ShapeRadius * 2, ShapeRadius * 2));
+                Painter->fillPath(EllipsePath, Qt::black);
                 break;
             }
             }
@@ -723,6 +734,10 @@ namespace Kim {
             QBuffer Buffer(&Array);
             Buffer.open(QIODevice::ReadOnly);
             Image.loadFromData(Array);
+        }
+
+        void SetContent(const QByteArray& Content){
+            this->Image.loadFromData(Content);
         }
 
         virtual void keyPressEvent(QKeyEvent* event)override{

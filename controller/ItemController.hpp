@@ -1,32 +1,39 @@
-﻿    #pragma once
+﻿#pragma once
 #include <QDialog>
+#include <QLinkedList>
 #include <QPushButton>
 #include <QTextEdit>
-#include<QTime>
+#include <QTime>
 #include <QVBoxLayout>
 #include"GraphicsObjectController.hpp"
 #include"../view/ItemView.hpp"
 namespace Kim {
-    static const QString IdentityTimeFormat = "yyyy_MM_dd_hh_mm_ss_zzz";
-    static const QString NormalTimeFormat = "yyyy/MM/dd hh:mm:ss";
     class KTextSerializer;
     class KDBSerializer;
+    class KItemGroupController;
+    class KConnectionController;
     // TODO:
     // Modify signal
     class KItemController : public KGraphicsObjectController{
         Q_OBJECT
         friend class KTextSerializer;
         friend class KDBSerializer;
+        friend class KConnectionController;
     private:
-        KFoldMark* ExpandMark = nullptr;
-        KFoldMark* CollapseMark = nullptr;
+        KItemMark* ExpandMark = nullptr;
+        KItemMark* CollapseMark = nullptr;
+        KItemMark* UngroupMark = nullptr;
+        KItemMark* GroupToNewCanvasMark = nullptr;
+        KItemGroupController* ItemGroupController = nullptr;
+        QLinkedList<KConnectionController*>OutConnections = {};
+        QLinkedList<KConnectionController*>InConnections = {};
     protected:
+        // need serialize
         QDateTime CreatedTime;
         QDateTime LastModifiedTime;
-        QString Identity = "";
+        qint64 Identity = CreateID();
         QString Alias = "";
         int FoldConnectionCount = 0;
-        int OutConnectionCount = 0;
         bool Collapsed = false;
         QPointF ParentPosWhenCollapse = {};
     signals:
@@ -38,6 +45,9 @@ namespace Kim {
         void RequestExpandSignal(KItemController* Controller);
         void RequestCollapseSignal(KItemController* Controller);
         void RequestSelectAllChildrenSignal(KItemController* Controller, SelectionType);
+        void UngroupSignal(KItemController* Controller);
+        void GroupToNewCanvasSignal(KItemController* Controller);
+        void DestroyedSignal(KItemController* Controller);
     public slots:
         void EmitStartConnectingSignal(){
             emit StartConnectingSignal(this);
@@ -63,10 +73,157 @@ namespace Kim {
         void EmitRequestSelectAllChildrenSignal(SelectionType Type){
             emit RequestSelectAllChildrenSignal(this, Type);
         }
+        void EmitUngroupSignal(){
+            emit UngroupSignal(this);
+        }
+        void EmitGroupToNewCanvasSignal(){
+            emit GroupToNewCanvasSignal(this);
+        }
+        void UpdateMark(){
+            //////////////////////////////// Expand & Collapse ////////////////////////////////
+            {
+                // add expand mark
+                if(this->FoldConnectionCount > 0 && !ExpandMark){
+                    ExpandMark = new KItemMark(KItemMark::Plus);
+                    ExpandMark->setParentItem(GraphicsObject);
+                    connect(ExpandMark,
+                            &KItemMark::ClickedSignal,
+                            this,
+                            &KItemController::EmitRquestExpandSignal);
+                }
+                // remove expand mark
+                else if(this->FoldConnectionCount == 0 && ExpandMark){
+                    delete ExpandMark;
+                    ExpandMark = nullptr;
+                }
+
+                int VisibleOutConnection = OutConnections.size() - FoldConnectionCount;
+                // add collapse mark
+                if(VisibleOutConnection > 0 && !CollapseMark){
+                    CollapseMark = new KItemMark(KItemMark::Minus);
+                    CollapseMark->setParentItem(GraphicsObject);
+                    connect(CollapseMark,
+                            &KItemMark::ClickedSignal,
+                            this,
+                            &KItemController::EmitRequestCollapseSignal);
+                }
+                // remove collapse mark
+                else if(VisibleOutConnection == 0 && CollapseMark){
+                    delete CollapseMark;
+                    CollapseMark = nullptr;
+                }
+
+                // update layout
+                if(ExpandMark && CollapseMark){
+                    const auto& ItemBouding = GraphicsObject->boundingRect();
+                    const auto& ExpandMarkBouding = ExpandMark->boundingRect();
+                    const auto& CollapseMarkBouding = CollapseMark->boundingRect();
+                    qreal MaxW = qMax(ExpandMarkBouding.width(), CollapseMarkBouding.width());
+                    qreal MaxH = qMax(ExpandMarkBouding.height(), CollapseMarkBouding.height());
+                    const qreal HGap = 5.0;
+                    const qreal VGap = 5.0;
+                    const qreal PosYUp = ItemBouding.center().y() - VGap - MaxH / 2.0;
+                    const qreal PosYDown = ItemBouding.center().y() + VGap + MaxH / 2.0;
+                    const qreal PosX = ItemBouding.left() - HGap - MaxW / 2.0;
+                    ExpandMark->setPos(PosX, PosYUp);
+                    CollapseMark->setPos(PosX, PosYDown);
+                }
+                else{
+                    KItemMark* TargetMark = nullptr;
+                    if(ExpandMark){
+                        TargetMark = ExpandMark;
+                    }
+                    else if(CollapseMark){
+                        TargetMark = CollapseMark;
+                    }
+                    if(TargetMark){
+                        const auto& ItemBouding = GraphicsObject->boundingRect();
+                        const auto& MarkBouding = TargetMark->boundingRect();
+                        const qreal HGap = 5.0;
+                        const qreal PosY = ItemBouding.center().y();
+                        const qreal PosX = ItemBouding.left() - HGap - MarkBouding.width() / 2.0;
+                        TargetMark->setPos(PosX, PosY);
+                    }
+                }
+            }
+
+            //////////////////////////////// Group & Ungroup ////////////////////////////////
+            {
+                // add group mark
+                if(this->ItemGroupController && !UngroupMark){
+                    UngroupMark = new KItemMark(KItemMark::Plus);
+                    GroupToNewCanvasMark = new KItemMark(KItemMark::Ellipse);
+                    UngroupMark->SetRadius(16);
+                    GroupToNewCanvasMark->SetRadius(16);
+                    UngroupMark->setParentItem(GraphicsObject);
+                    GroupToNewCanvasMark->setParentItem(GraphicsObject);
+                    connect(UngroupMark,
+                            &KItemMark::ClickedSignal,
+                            this,
+                            &KItemController::EmitUngroupSignal);
+                    connect(GroupToNewCanvasMark,
+                            &KItemMark::ClickedSignal,
+                            this,
+                            &KItemController::EmitGroupToNewCanvasSignal);
+                }
+                // remove group mark
+                else if(!this->ItemGroupController && UngroupMark){
+                    delete UngroupMark;
+                    delete GroupToNewCanvasMark;
+                    UngroupMark = nullptr;
+                    GroupToNewCanvasMark = nullptr;
+                }
+
+                // update layout
+                if(UngroupMark && GroupToNewCanvasMark){
+
+                    const auto& ItemBouding = GraphicsObject->boundingRect();
+                    const auto& UngroupMarkBouding = UngroupMark->boundingRect();
+                    const auto& GroupToNewCanvasMarkBouding = GroupToNewCanvasMark->boundingRect();
+                    qreal MaxW = qMax(UngroupMarkBouding.width(), GroupToNewCanvasMarkBouding.width());
+                    qreal MaxH = qMax(UngroupMarkBouding.height(), GroupToNewCanvasMarkBouding.height());
+                    const qreal HGap = 5.0;
+                    const qreal VGap = 5.0;
+                    const qreal PosYUp = ItemBouding.center().y() - VGap - MaxH / 2.0;
+                    const qreal PosYDown = ItemBouding.center().y() + VGap + MaxH / 2.0;
+                    const qreal PosX = ItemBouding.right() + HGap + MaxW / 2.0;
+                    UngroupMark->setPos(PosX, PosYUp);
+                    GroupToNewCanvasMark->setPos(PosX, PosYDown);
+
+//                    const auto& ItemBouding = GraphicsObject->boundingRect();
+//                    const auto& UngroupMarkBouding = UngroupMark->boundingRect();
+//                    const auto& GroupToNewCanvasMarkBouding = GroupToNewCanvasMark->boundingRect();
+//                    const qreal UngroupW = UngroupMarkBouding.width();
+//                    const qreal GroupToCanvasW = GroupToNewCanvasMarkBouding.width();
+//                    const qreal HGap = 5.0;
+//                    const qreal PosY = ItemBouding.center().y();
+//                    const qreal UngroupPosX = ItemBouding.right() + HGap + UngroupW / 2.0;
+//                    const qreal GroupToNewCanvasPosX = UngroupPosX  + UngroupW / 2.0 + HGap + GroupToCanvasW / 2.0;;
+//                    UngroupMark->setPos(UngroupPosX, PosY);
+//                    GroupToNewCanvasMark->setPos(GroupToNewCanvasPosX, PosY);
+                }
+                else{
+                    KItemMark* TargetMark = nullptr;
+                    if(UngroupMark){
+                        TargetMark = UngroupMark;
+                    }
+                    else if(GroupToNewCanvasMark){
+                        TargetMark = GroupToNewCanvasMark;
+                    }
+                    if(TargetMark){
+                        const auto& ItemBouding = GraphicsObject->boundingRect();
+                        const auto& MarkBouding = TargetMark->boundingRect();
+                        const qreal HGap = 5.0;
+                        const qreal PosY = ItemBouding.center().y();
+                        const qreal PosX = ItemBouding.right() + HGap + MarkBouding.width() / 2.0;
+                        TargetMark->setPos(PosX, PosY);
+                    }
+                }
+            }
+        }
     public:
         KItemController(KItemView* ItemView):KGraphicsObjectController(ItemView){
             this->SetCreatedTime(QDateTime::currentDateTime(), true);
-            Identity = "Item_" + CreatedTime.toString(IdentityTimeFormat);
             connect(ItemView,
                     &KItemView::StartDragDropSignal,
                     this,
@@ -91,10 +248,20 @@ namespace Kim {
                     &KItemView::SelectedAllChildrenSignal,
                     this,
                     &KItemController::EmitRequestSelectAllChildrenSignal);
+            connect(ItemView,
+                    &KItemView::SizeChangedSignal,
+                    this,
+                    &KItemController::UpdateMark);
+
         }
         virtual ~KItemController(){
-            GraphicsObject->scene()->removeItem(GraphicsObject);
+            emit DestroyedSignal(this);
             delete GraphicsObject;
+            GraphicsObject = nullptr;
+            // CollapseMark & ExpandMark will be auto delete
+            // because they are the child of grahics obj
+            CollapseMark = nullptr;
+            ExpandMark = nullptr;
         }
 
         bool IsCollapsed() {
@@ -103,6 +270,7 @@ namespace Kim {
 
         void SetCollapsed(bool Collapsed){
             this->Collapsed = Collapsed;
+            this->GraphicsObject->setVisible(!Collapsed);
         }
 
         void SetParentPosWhenCollapse(const QPointF& Pos){
@@ -111,6 +279,15 @@ namespace Kim {
 
         QPointF GetParentPosWhenCollapse(){
             return this->ParentPosWhenCollapse;
+        }
+
+        void SetItemGroupController(KItemGroupController* Controller){
+            this->ItemGroupController = Controller;
+            UpdateMark();
+        }
+
+        KItemGroupController* GetItemGroupController(){
+            return this->ItemGroupController;
         }
 
         template<typename T>
@@ -124,10 +301,10 @@ namespace Kim {
         void OnModified(){
             LastModifiedTime = QDateTime::currentDateTime();
         }
-        void SetIdentity(const QString& Identity){
+        void SetIdentity(qint64 Identity){
             this->Identity = Identity;
         }
-        QString GetIdentity()const{
+        qint64 GetIdentity()const{
             return Identity;
         }
         void SetAlias(const QString& Alias){
@@ -143,112 +320,29 @@ namespace Kim {
             }
         }
         int GetFoldConnectionCount()const{return FoldConnectionCount;}
-        int GetOutConnectionCount()const{return OutConnectionCount;}
         void SetFoldConnectionCount(int FoldConnectionCount){
             this->FoldConnectionCount = FoldConnectionCount;
             UpdateMark();
-//            int OldCount = this->FoldConnectionCount, NewCount = FoldConnectionCount;
-//            Q_ASSERT(OldCount >= 0 && NewCount >= 0);
-//            this->FoldConnectionCount = FoldConnectionCount;
-//            // add expand mark
-//            if(OldCount == 0 && NewCount > 0){
-//                Q_ASSERT(!ExpandMark);
-//                ExpandMark = new KFoldMark;
-//                connect(ExpandMark,
-//                        &KFoldMark::ClickedSignal,
-//                        this,
-//                        &KItemController::EmitRquestUnfoldSignal);
-//                ExpandMark->setParentItem(GraphicsObject);
-//                // update FoldMark position
-//                const auto& ItemBouding = GraphicsObject->boundingRect();
-//                const auto& MarkBouding = ExpandMark->boundingRect();
-//                const qreal Gap = 5.0;
-//                const qreal PosY = ItemBouding.center().y();
-//                const qreal PosX = ItemBouding.left() - Gap - MarkBouding.width() / 2.0;
-//                ExpandMark->setPos(PosX, PosY);
-//            }
-//            // remove expand mark
-//            else if(OldCount > 0 && NewCount == 0){
-//                Q_ASSERT(ExpandMark);
-//                delete ExpandMark;
-//                ExpandMark = nullptr;
-//            }
-        }
-        void SetOutConnectionCount(int OutConnectionCount){
-            this->OutConnectionCount = OutConnectionCount;
-            UpdateMark();
-//            int OldCount = this->OutConnectionCount, NewCount = OutConnectionCount;
-//            Q_ASSERT(OldCount >= 0 && NewCount >= 0);
-//            this->OutConnectionCount = NewCount;
-//            // add collapse mark
-
-//            // remove collapse mark
         }
 
-        void UpdateMark(){
-            // add expand mark
-            if(this->FoldConnectionCount > 0 && !ExpandMark){
-                ExpandMark = new KFoldMark(KFoldMark::Plus);
-                ExpandMark->setParentItem(GraphicsObject);
-                connect(ExpandMark,
-                        &KFoldMark::ClickedSignal,
-                        this,
-                        &KItemController::EmitRquestExpandSignal);
-            }
-            // remove expand mark
-            else if(this->FoldConnectionCount == 0 && ExpandMark){
-                delete ExpandMark;
-                ExpandMark = nullptr;
-            }
+        const QLinkedList<KConnectionController*>& GetOutConnections(){
+            return OutConnections;
+        }
 
-            int VisibleOutConnection = OutConnectionCount - FoldConnectionCount;
-            // add collapse mark
-            if(VisibleOutConnection > 0 && !CollapseMark){
-                CollapseMark = new KFoldMark(KFoldMark::Minus);
-                CollapseMark->setParentItem(GraphicsObject);
-                connect(CollapseMark,
-                        &KFoldMark::ClickedSignal,
-                        this,
-                        &KItemController::EmitRequestCollapseSignal);
-            }
-            // remove collapse mark
-            else if(VisibleOutConnection == 0 && CollapseMark){
-                delete CollapseMark;
-                CollapseMark = nullptr;
-            }
+        const QLinkedList<KConnectionController*>& GetInConnections(){
+            return InConnections;
+        }
 
-            // update layout
-            if(ExpandMark && CollapseMark){
-                const auto& ItemBouding = GraphicsObject->boundingRect();
-                const auto& ExpandMarkBouding = ExpandMark->boundingRect();
-                const auto& CollapseMarkBouding = CollapseMark->boundingRect();
-                qreal MaxW = qMax(ExpandMarkBouding.width(), CollapseMarkBouding.width());
-                qreal MaxH = qMax(ExpandMarkBouding.height(), CollapseMarkBouding.height());
-                const qreal HGap = 5.0;
-                const qreal VGap = 5.0;
-                const qreal PosYUp = ItemBouding.center().y() - VGap - MaxH / 2.0;
-                const qreal PosYDown = ItemBouding.center().y() + VGap + MaxH / 2.0;
-                const qreal PosX = ItemBouding.left() - HGap - MaxW / 2.0;
-                ExpandMark->setPos(PosX, PosYUp);
-                CollapseMark->setPos(PosX, PosYDown);
-            }
-            else{
-                KFoldMark* TargetMark = nullptr;
-                if(ExpandMark){
-                    TargetMark = ExpandMark;
-                }
-                else if(CollapseMark){
-                    TargetMark = CollapseMark;
-                }
-                if(TargetMark){
-                    const auto& ItemBouding = GraphicsObject->boundingRect();
-                    const auto& MarkBouding = TargetMark->boundingRect();
-                    const qreal HGap = 5.0;
-                    const qreal PosY = ItemBouding.center().y();
-                    const qreal PosX = ItemBouding.left() - HGap - MarkBouding.width() / 2.0;
-                    TargetMark->setPos(PosX, PosY);
-                }
-            }
+        void RemoveOutConnection(KConnectionController* Controller){
+            OutConnections.removeOne(Controller);
+        }
+
+        void RemoveInConnection(KConnectionController* Controller){
+            InConnections.removeOne(Controller);
+        }
+
+        QLinkedList<KConnectionController*> GetConnections(){
+            return GetOutConnections() + GetInConnections();
         }
     };
     //////////////////////////////// Text Item ////////////////////////////////

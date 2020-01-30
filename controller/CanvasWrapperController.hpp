@@ -58,6 +58,11 @@ namespace Kim {
                     &KCanvasWrapperView::SpecialInputSignal,
                     CanvasController,
                     &KCanvasController::OnSpecialInput);
+            connect(View,
+                    &KCanvasWrapperView::GroupToTextItem,
+                    [=]{
+               this->CanvasController->OnGroupToItem(KTextItemView::Type);
+            });
         }
         QWidget* GetView(){
             return View;
