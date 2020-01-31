@@ -23,6 +23,9 @@ namespace Kim {
         void SelectedAllChildrenSignal(KConnectionController*, SelectionType);
         void DestroyedSignal(KConnectionController* Controller);
     public slots:
+        void Destroy(){
+            delete this;
+        }
         void OnItemSizeChanged(KItemController* Controller){
             UpdateConnectionDecoration();
         }
@@ -174,6 +177,7 @@ namespace Kim {
             emit DestroyedSignal(this);
             if(SrcItemController){
                 SrcItemController->OutConnections.removeOne(this);
+                SrcItemController->UpdateMark();
             }
             if(DstItemController){
                 DstItemController->InConnections.removeOne(this);

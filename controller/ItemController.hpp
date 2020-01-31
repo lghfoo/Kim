@@ -255,13 +255,18 @@ namespace Kim {
 
         }
         virtual ~KItemController(){
+            qDebug()<<"258";
             emit DestroyedSignal(this);
+            qDebug()<<"260";
             delete GraphicsObject;
+            qDebug()<<"262";
             GraphicsObject = nullptr;
             // CollapseMark & ExpandMark will be auto delete
             // because they are the child of grahics obj
             CollapseMark = nullptr;
             ExpandMark = nullptr;
+            UngroupMark = nullptr;
+            GroupToNewCanvasMark = nullptr;
         }
 
         bool IsCollapsed() {
@@ -288,6 +293,10 @@ namespace Kim {
 
         KItemGroupController* GetItemGroupController(){
             return this->ItemGroupController;
+        }
+
+        bool IsGroupItem(){
+            return this->ItemGroupController != nullptr;
         }
 
         template<typename T>

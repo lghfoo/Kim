@@ -29,9 +29,9 @@ int main(int argc, char *argv[])
 // 22、添加数据库Serializer
 // 32、使用long long作id
 // 33、item的bounding改变时更新fold mark
+// 30、group节点（右侧big plus）
 
 // TODO:
-// 30、group节点（右侧big plus）
 // 28、多场景管理
 // 35、id管理
 // 30、节点引用场景
@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
 // 21、重构Serializer
 // 23、重构Mime
 // 35、重构sql语句
+// 36、选择某条路径expand
 
 // 2020/1/29 11:02
 // Done:
