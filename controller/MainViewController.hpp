@@ -4,6 +4,17 @@
 namespace Kim {
     class KMainViewController : public QObject{
         Q_OBJECT
+    signals:
+        void SaveProjectSignal();
+        void OpenProjectSignal();
+    public slots:
+        void OnNewCanvas(){
+            CreateAndChangeActive();
+        }
+
+        void OnOpenCanvas(){
+
+        }
     private:
         KMainView* MainView = new KMainView;
         QList<KCanvasWrapperController*> CanvasWrapperControllers;
@@ -11,13 +22,17 @@ namespace Kim {
         QTimer* UpdateStatusBarTimer = new QTimer;
     public:
         KMainViewController(){
-            ActiveCanvasWrapper = new KCanvasWrapperController;
-            this->MainView->setCentralWidget(ActiveCanvasWrapper->GetView());
+            connect(MainView, &KMainView::SaveProjectSignal, this, &KMainViewController::SaveProjectSignal);
+            connect(MainView, &KMainView::OpenProjectSignal, this, &KMainViewController::OpenProjectSignal);
+            connect(MainView, &KMainView::NewCanvasSignal, this, &KMainViewController::OnNewCanvas);
+            connect(MainView, &KMainView::OpenCanvasSignal, this, &KMainViewController::OnOpenCanvas);
+            this->MainView->setCentralWidget(MainView->CanvasTabs);
             connect(UpdateStatusBarTimer,
                     &QTimer::timeout,
                     this,
                     &KMainViewController::UpdateStatusBar);
             UpdateStatusBarTimer->start(100);
+            CreateAndChangeActive();
         }
         ~KMainViewController(){
             UpdateStatusBarTimer->stop();
@@ -25,6 +40,33 @@ namespace Kim {
         }
         KMainView* GetMainView(){
             return MainView;
+        }
+        void CreateAndChangeActive(){
+            ActiveCanvasWrapper = new KCanvasWrapperController;
+            ActiveCanvasWrapper->SetCanvasName(CreateCanvasName());
+            MainView->CanvasTabs->addTab(ActiveCanvasWrapper->GetView(), ActiveCanvasWrapper->GetCanvasName());
+            MainView->CanvasTabs->setCurrentWidget(ActiveCanvasWrapper->GetView());
+            CanvasWrapperControllers.append(ActiveCanvasWrapper);
+        }
+        void ChangeActive(KCanvasWrapperController* Active){
+            MainView->CanvasTabs->setCurrentWidget(Active->GetView());
+        }
+        QString CreateCanvasName(){
+            int MinOrder = 1;
+            for(auto Controller : CanvasWrapperControllers){
+                const auto& Name = Controller->GetCanvasName();
+                const auto& List = Name.split('_');
+                if(List.size() == 2 && List[0] == "Canvas"){
+                    bool Ok = true;
+                    int Cnt = List[1].toInt(&Ok);
+                    if(Ok){
+                        if(Cnt >= MinOrder){
+                            MinOrder = Cnt + 1;
+                        }
+                    }
+                }
+            }
+            return QString("Canvas_") + QString::number(MinOrder);
         }
     public slots:
         void UpdateStatusBar(){

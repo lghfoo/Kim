@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include<QGraphicsView>
 #include<QGraphicsScene>
 #include<QKeyEvent>
@@ -19,37 +19,47 @@ namespace Kim {
             int SubCellHCount = 2;
         };
         class KCursor : public QGraphicsItem{
+        private:
+            qreal radius = 12.0;
+            qreal inner_radius = 7;
+            qreal outer_radius = radius + 9;
         public:
             QRectF boundingRect() const override
             {
-                return QRectF(-outer_radius, -outer_radius, outer_radius * 2, outer_radius * 2);
+                qreal Padding = 6.0;
+                qreal W = outer_radius * 2 + Padding;
+                qreal X = -W / 2.0;
+                return QRectF(X, X, W, W);
             }
-            void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override
-            {
-                QPen pen = painter->pen();
-                pen.setWidth(2);
-                pen.setColor(Qt::black);
-                painter->setPen(pen);
+            QPainterPath Shape() const{
+                QPainterPath Path;
                 auto cycle = QRectF(-radius, -radius, radius * 2, radius * 2);
-                painter->drawEllipse(cycle);
-
-                pen.setCapStyle(Qt::PenCapStyle::RoundCap);
-                pen.setWidth(3);
-                painter->setPen(pen);
+                Path.addEllipse(cycle);
                 constexpr int len = 4;
                 qreal x0s[len] = {inner_radius, 0, -inner_radius, 0};
                 qreal y0s[len] = {0, inner_radius, 0, -inner_radius};
                 qreal x1s[len] = {outer_radius, 0, -outer_radius, 0};
                 qreal y1s[len] = {0, outer_radius, 0, -outer_radius};
                 for(int i = 0; i < len; i++){
-                    painter->drawLine(QLineF(x0s[i], y0s[i], x1s[i], y1s[i]));
+                    Path.moveTo(x0s[i], y0s[i]);
+                    Path.lineTo(x1s[i], y1s[i]);
                 }
-
+                return Path;
             }
-        private:
-            qreal radius = 12.0;
-            qreal inner_radius = 7;
-            qreal outer_radius = radius + 9;
+            virtual QPainterPath shape()const override{
+                QPainterPathStroker Stroker;
+                Stroker.setWidth(3);
+                return Stroker.createStroke(Shape());
+            }
+            void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override
+            {
+                QPen Pen;
+                Pen.setColor(Qt::black);
+                Pen.setWidth(3);
+                Pen.setCapStyle(Qt::RoundCap);
+                painter->setPen(Pen);
+                painter->drawPath(Shape());
+            }
         };
     signals:
         void DragMoveSignal(QGraphicsSceneDragDropEvent *DragDropEvent);
@@ -129,6 +139,7 @@ namespace Kim {
         virtual void mousePressEvent(QGraphicsSceneMouseEvent* Event) override{
             if(!itemAt(Event->scenePos(), QTransform())){
                 Cursor->setPos(Event->scenePos());
+                Cursor->update();
             }
             QGraphicsScene::mousePressEvent(Event);
         }

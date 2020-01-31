@@ -610,7 +610,7 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
             }
         }
 
-        virtual void Deserialize(const QString& InputPath, KCanvasController* CanvasController) override{
+        virtual void Deserialize(const QString& InputPath, KCanvasController* CanvasController, const QVariant& CanvasID = QVariant()) override{
             Context.Reset();
             Context.CurrentSerializer = this;
             QFile InputFile(InputPath);

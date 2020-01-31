@@ -6,21 +6,6 @@ int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     Kim::KApplicationController::Startup();
-//    QString path = "C:/Users/35974/Desktop/data.db";
-//    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");//not dbConnection
-//    db.setDatabaseName(path);
-//    if(!db.open()){
-//        qDebug()<<"open fail";
-//        qDebug()<<db.lastError();
-//    }
-//    QSqlQuery query("select * from Config");
-//    QSqlRecord rec = query.record();
-//    qDebug()<<"rec cnt: "<<rec.count();
-//    if(query.next()){
-//        qDebug()<<"query success";
-//        qDebug()<<query.value("Key");
-//        qDebug()<<query.value("Value");
-//    }
     return a.exec();
 }
 
@@ -29,6 +14,9 @@ int main(int argc, char *argv[])
 // Done:
 // 30、group节点（右侧big plus）
 // ??、DB Serializer
+
+// Partial:
+// 15、修复Item缩放时场景像素残留bug：bounding有问题: 放大场景，频繁点击并拖动场景，光标还有残影
 
 // TODO:
 // 28、多场景管理
@@ -39,7 +27,6 @@ int main(int argc, char *argv[])
 // 13、文本序列化，添加对折叠的处理
 // 10、connection支持文本输入
 // 11、工具面板
-// 15、修复Item缩放时场景像素残留bug
 // 16、ImageItem Format
 // 17、Text item cache bounding
 // 24、复制、剪切节点、连接

@@ -322,13 +322,21 @@ namespace Kim {
             return PromptText;
         }
 
-        virtual QRectF boundingRect() const override{
+        QRectF TextBounding()const{
             QRectF TextSize = GetTextSize();
             qreal Width = TextSize.width() + Padding,
                 Height = TextSize.height() + Padding,
                 TempX = -Width / 2.0,
                 TempY = -Height / 2.0;
             return QRectF(TempX, TempY, Width, Height);
+        }
+
+        virtual QRectF boundingRect() const override{
+            qreal PixelPadding = 1.0;
+            const auto& Bounding = TextBounding();
+            qreal W = Bounding.width() + PixelPadding * 2;
+            qreal H = Bounding.height() + PixelPadding * 2;
+            return QRectF(-W/2, -H/2, W, H);
         }
 
         KTextItemView(){
@@ -354,7 +362,7 @@ namespace Kim {
             QPen Pen(Qt::black);
             painter->setPen(Pen);
             QPainterPath Path;
-            const QRectF& Bounding = this->boundingRect();
+            const QRectF& Bounding = this->TextBounding();
             Path.moveTo(Bounding.topLeft());
             Path.addRoundedRect(Bounding, 5.0, 5.0);
             painter->fillPath(Path, QBrush(Qt::white));
@@ -369,14 +377,14 @@ namespace Kim {
             tmp.replace(QLatin1Char('\n'), QChar::LineSeparator);
             QTextLayout layout(tmp, Font);
             SetupTextLayout(&layout);
-            layout.draw(painter, QPointF(boundingRect().x() + Padding/2.0, boundingRect().y() + Padding/2.0));
+            layout.draw(painter, QPointF(Bounding.x() + Padding/2.0, Bounding.y() + Padding/2.0));
 
             Pen.setColor(Qt::black);
             if(this->isSelected()){
                 Pen.setWidth(3);
             }
             painter->setPen(Pen);
-            painter->drawRoundedRect(this->boundingRect(), 5.0, 5.0);
+            painter->drawRoundedRect(Bounding, 5.0, 5.0);
 
         }
 
@@ -578,7 +586,7 @@ namespace Kim {
     public:
         int type() const override { return Type; }
 
-        virtual QRectF boundingRect() const override{
+        QRectF ImageBounding()const{
             static const QSizeF MinSize(128, 128);
             QRectF Bounding(0, 0, MinSize.width(), MinSize.height());
             if(Image.rect().width() > 0 && Image.rect().height() > 0){
@@ -591,6 +599,14 @@ namespace Kim {
                         Bounding.width() + Padding,
                         Bounding.height() + Padding
                         );
+        }
+
+        virtual QRectF boundingRect() const override{
+            const auto& Bound = ImageBounding();
+            qreal PixelPadding = 1;
+            qreal W = Bound.width() + 2 * PixelPadding;
+            qreal H = Bound.height() + 2 * PixelPadding;
+            return QRectF(-W/2, -H/2, W, H);
         }
 
         KImageItemView(){
@@ -646,14 +662,14 @@ namespace Kim {
             QPen Pen(Qt::black);
             painter->setPen(Pen);
             QPainterPath Path;
-            const QRectF& Bounding = this->boundingRect();
+            const QRectF& Bounding = this->ImageBounding();
             Path.moveTo(Bounding.topLeft());
             Path.addRoundedRect(Bounding, 5.0, 5.0);
             painter->fillPath(Path, QBrush(Qt::white));
 
             painter->save();
             painter->setClipPath(Path);
-            painter->drawImage(boundingRect(), Image, Image.rect());
+            painter->drawImage(Bounding, Image, Image.rect());
             painter->restore();
 
             Pen.setColor(Qt::black);

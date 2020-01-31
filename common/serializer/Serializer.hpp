@@ -52,7 +52,7 @@ namespace Kim {
          * @param InputPath: input path
          * @param CanvasController: the controller to serialize to, should be not null
          */
-        virtual void Deserialize(const QString& InputPath, KCanvasController* CanvasController) = 0;
+        virtual void Deserialize(const QString& InputPath, KCanvasController* CanvasController, const QVariant& CanvasID = QVariant()) = 0;
         virtual ~KSerializer(){}
     };
 }

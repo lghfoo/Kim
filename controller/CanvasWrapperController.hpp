@@ -11,12 +11,6 @@
 namespace Kim {
     class KCanvasWrapperController : public QObject{
         Q_OBJECT
-    private:
-        KCanvasController* CanvasController = new KCanvasController;
-        KCanvasWrapperView* View = new KCanvasWrapperView(CanvasController->GetCanvasView());
-        QString SavedFilename = "";
-        QString LastSavedDir = "";
-        QString LastLoadDir = "";
     public slots:
         void Save(){
             if(SavedFilename.isEmpty())SaveAs();
@@ -40,6 +34,12 @@ namespace Kim {
             LastSavedDir = FileInfo.absolutePath();
             SaveFileHelper(SavedFilename);
         }
+    private:
+        KCanvasController* CanvasController = new KCanvasController;
+        KCanvasWrapperView* View = new KCanvasWrapperView(CanvasController->GetCanvasView());
+        QString SavedFilename = "";
+        QString LastSavedDir = "";
+        QString LastLoadDir = "";
     public:
         KCanvasWrapperController(){
             connect(CanvasController,
@@ -70,9 +70,14 @@ namespace Kim {
         KCanvasController* GetCanvasController(){
             return CanvasController;
         }
-
+        QString GetCanvasName(){
+            return CanvasController->GetCanvasName();
+        }
+        void SetCanvasName(const QString& Name){
+            CanvasController->SetCanvasName(Name);
+        }
         void SaveFileHelper(const QString& Filename){
-            KDBSerializer Serializer;
+            KDBSerializer Serializer(Filename);
             connect(&Serializer,
                     &KSerializer::FinishedSignal,
                     []{
@@ -84,9 +89,8 @@ namespace Kim {
         }
 
         void LoadFileHelper(const QString& Filename){
-            KDBSerializer Serilizer;
+            KDBSerializer Serilizer(Filename);
             Serilizer.Deserialize(Filename, CanvasController);
         }
-
     };
 }

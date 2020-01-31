@@ -66,6 +66,7 @@ namespace Kim {
         };
     private:
         qint64 CanvasID = CreateID();
+        QString CanvasName = "";
         KCanvasState CanvasState;
         KSceneContext SceneContext;
         KCanvasView* CanvasView = new KCanvasView;
@@ -272,7 +273,6 @@ namespace Kim {
             }
         }
 
-
         void OnItemGroupToCanvas(KItemController* Controller){
 
         }
@@ -404,12 +404,28 @@ namespace Kim {
 
         }
 
+        qint64 GetCanvasID()const{
+            return this->CanvasID;
+        }
+
+        void SetCanvasID(const qint64 ID){
+            this->CanvasID = ID;
+        }
+
         const KCanvasState& GetCanvasState(){
             return CanvasState;
         }
 
         KCanvasView* GetCanvasView(){
             return CanvasView;
+        }
+
+        QString GetCanvasName(){
+            return CanvasName;
+        }
+
+        void SetCanvasName(const QString& Name){
+            this->CanvasName = Name;
         }
 
         // Children should be empty
