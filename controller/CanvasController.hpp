@@ -70,9 +70,10 @@ namespace Kim {
         KSceneContext SceneContext;
         KCanvasView* CanvasView = new KCanvasView;
         KScene* Scene = CanvasView->GetScene();
-        QList<KItemController*>ItemControlleres = {};
-        QList<KConnectionController*>ConnectionControlleres = {};
+        QLinkedList<KItemController*>ItemControlleres = {};
+        QLinkedList<KConnectionController*>ConnectionControlleres = {};
         QLinkedList<KGraphicsObjectController*>SelectedControlleres = {};
+        QMap<qint64, KItemGroupController*> GroupControlleres = {};
     signals:
         void SaveSingal();
         void SaveAsSignal();
@@ -260,7 +261,6 @@ namespace Kim {
         // when delete item, always delete connection first.
         // except for group item
         void OnItemDelete(KItemController* Controller){
-            qDebug()<<"on item delete";
             ItemControlleres.removeOne(Controller);
             if(Controller->IsSelected()){
                 SelectedControlleres.removeOne(Controller);
@@ -272,12 +272,43 @@ namespace Kim {
             }
         }
 
-        void OnItemUngroup(KItemController* Controller){
-
-        }
 
         void OnItemGroupToCanvas(KItemController* Controller){
 
+        }
+
+        void OnItemUngroup(KItemController* Controller){
+            GroupControlleres.remove(Controller->GetIdentity());
+            auto ItemGroup = Controller->GetItemGroupController();
+            if(ItemGroup){
+                const auto& PosWhenGrouping = ItemGroup->GetPosWhenGrouping();
+                const auto& CurrentPos = Controller->GetView()->pos();
+                const auto& DPos = CurrentPos - PosWhenGrouping;
+                const auto& Items = ItemGroup->GetItems();
+                const auto& Connections = ItemGroup->GetConnections();
+                const auto& InConnections = ItemGroup->GetInConnections();
+                const auto& OutConnections = ItemGroup->GetOutConnections();
+                for(auto Item : Items){
+                    Item->GetView()->moveBy(DPos.x(), DPos.y());
+                    auto Pos = Item->GetView()->pos();
+                    this->AddItem(Item, &Pos);
+                }
+                for(auto Conn : Connections){
+                    this->AddConnectionController(Conn);
+                }
+                for(auto InConn : InConnections){
+//                    InConn->GetSrcItemController()->AddOutConnection(InConn);
+                    InConn->ConnectSrcItem();
+                    this->AddConnectionController(InConn);
+                }
+                for(auto OutConn : OutConnections){
+//                    OutConn->GetDstItemController()->AddInConnection(OutConn);
+                    OutConn->ConnectDstItem();
+                    this->AddConnectionController(OutConn);
+                }
+                ItemGroup->Clear();
+                delete Controller;
+            }
         }
         // group外的item和connection与group内的所有item和connection有引用
         // group内的connection与group外的item有引用
@@ -285,31 +316,12 @@ namespace Kim {
             if(this->SelectedControlleres.isEmpty())return;
             QPointF GroupPos(0, 0);
             int Cnt = 0;
-//            QLinkedList<KItemController*>SrcItems{};
-//            QLinkedList<KItemController*>DstItems{};
             QSet<KConnectionController*>Visited{};
             KItemGroupController* ItemGroup = new KItemGroupController;
             for(auto Controller : this->SelectedControlleres){
                 // 只处理item，忽略connection
-//                // 处理src和dst节点都没有被选中的connection
-                if(Controller->type() == KConnectionView::Type){
-//                    auto Conn = static_cast<KConnectionController*>(Controller);
-//                    auto SrcItem = Conn->GetSrcItemController();
-//                    auto DstItem = Conn->GetDstItemController();
-//                    bool SrcSelected = SrcItem->IsSelected();
-//                    bool DstSelected = DstItem->IsSelected();
-//                    if(!SrcSelected && !DstSelected){
-//                        ItemGroup->AddInOutConnection(Conn);
-//                        ++Cnt;
-//                        GroupPos += Conn->GetConnectionView()->boundingRect().center();
-//                        this->RemoveConnection(Conn);
-//                        // 切断外界与group内部的连接
-//                        SrcItem->RemoveOutConnection(Conn);
-//                        DstItem->RemoveInConnection(Conn);
-//                    }
-                }
                 // item的所有connection都要被group
-                else{
+                if(Controller->type() != KConnectionView::Type){
                     auto Item = static_cast<KItemController*>(Controller);
                     this->RemoveItem(Item);
                     ItemGroup->AddItem(Item);
@@ -329,16 +341,16 @@ namespace Kim {
                         else if(SrcSelected){
                             // !DstSelected
                             ItemGroup->AddOutConnection(Conn);
-//                            DstItems.append(DstItem);
                             // 切断外界与group内部的连接
-                            DstItem->RemoveInConnection(Conn);
+                            Conn->DisconnectDstItem();
+//                            DstItem->RemoveInConnection(Conn);
                         }
                         else if(DstSelected){
                             // !SrcSelected
                             ItemGroup->AddInConnection(Conn);
-//                            SrcItems.append(SrcItem);
                             // 切断外界与group内部的连接
-                            SrcItem->RemoveOutConnection(Conn);
+                            Conn->DisconnectSrcItem();
+//                            SrcItem->RemoveOutConnection(Conn);
                         }
                         else{
                             // will not happen
@@ -357,25 +369,28 @@ namespace Kim {
             auto GroupItem = CreateItemController(ItemType);
             GroupItem->SetItemGroupController(ItemGroup);
             ItemGroup->SetGroupItem(GroupItem);
-            // signal is disconnect when remove, show clear selected manually
+            GroupControlleres.insert(GroupItem->GetIdentity(), ItemGroup);
+            connect(GroupItem, &KItemController::DestroyedSignal, ItemGroup, &KItemGroupController::Destory);
+            // signal is disconnect when remove, so clear selected manually
             // although AddItem will clear selection
             this->SelectedControlleres.clear();
             this->AddItem(GroupItem, &GroupPos);
+            ItemGroup->SetPosWhenGroupping(GroupPos);
             const auto& SrcItems = ItemGroup->GetSrcItems();
             for(auto SrcItem : SrcItems){
                 auto Conn = CreateAndAddConnectionController();
                 Conn->SetSrcItemController(SrcItem);
                 Conn->SetDstItemController(GroupItem);
-//                connect(Conn, &KConnectionController::DestroyedSignal,
-//                        ItemGroup, &KItemGroupController::OnInConnectionDestroyed);
+                connect(Conn, &KConnectionController::DestroyedSignal,
+                        ItemGroup, &KItemGroupController::OnInConnectionDestroyed);
             }
             const auto& DstItems = ItemGroup->GetDstItems();
             for(auto DstItem : DstItems){
                 auto Conn = CreateAndAddConnectionController();
                 Conn->SetSrcItemController(GroupItem);
                 Conn->SetDstItemController(DstItem);
-//                connect(Conn, &KConnectionController::DestroyedSignal,
-//                        ItemGroup, &KItemGroupController::OnOutConnectionDestroyed);
+                connect(Conn, &KConnectionController::DestroyedSignal,
+                        ItemGroup, &KItemGroupController::OnOutConnectionDestroyed);
             }
         }
     public:
@@ -609,10 +624,10 @@ namespace Kim {
         KItemController* AddItem(int ItemType, const QPointF* const Position = nullptr){
             auto Controller = CreateItemController(ItemType);
             AddItem(Controller, Position);
-            ItemControlleres.append(Controller);
             return Controller;
         }
 
+        // 默认在鼠标或光标处添加
         void AddItem(KItemController* ItemController,
                      const QPointF* const Position = nullptr){
             QPointF Pos(0, 0);
@@ -638,6 +653,7 @@ namespace Kim {
             auto Item = ItemController->GetView();
             Item->setSelected(true);
             AddItemAt(Item, Pos);
+            ItemControlleres.append(ItemController);
             ConnectItemController(ItemController);
         }
 
@@ -741,7 +757,6 @@ namespace Kim {
                 return nullptr;
                 break;
             }
-//            ConnectItemController(Controller);
             return Controller;
         }
 
@@ -786,6 +801,14 @@ namespace Kim {
             return nullptr;
         }
 
+        QMap<qint64, KItemController*> CreateItemMap(){
+            QMap<qint64, KItemController*> Ret {};
+            for(auto Controller : ItemControlleres){
+                Ret.insert(Controller->GetIdentity(), Controller);
+            }
+            return Ret;
+        }
+
         void DeleteSelectedControlleres(){
             while (!SelectedControlleres.isEmpty()) {
                 KGraphicsObjectController* Controller = SelectedControlleres.front();
@@ -813,14 +836,7 @@ namespace Kim {
         }
 
         void DeleteItem(KItemController* Controller){
-//            if(Controller->IsGroupItem()){
-////                Controller->GetItemGroupController()->DirectDelete();
-//                DeleteGroupItem(Controller);
-//            }
-//            else{
-                delete Controller;
-
-//            }
+            delete Controller;
         }
 
         void DeleteGroupItem(KItemController* Controller){

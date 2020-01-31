@@ -255,11 +255,8 @@ namespace Kim {
 
         }
         virtual ~KItemController(){
-            qDebug()<<"258";
             emit DestroyedSignal(this);
-            qDebug()<<"260";
             delete GraphicsObject;
-            qDebug()<<"262";
             GraphicsObject = nullptr;
             // CollapseMark & ExpandMark will be auto delete
             // because they are the child of grahics obj
@@ -328,6 +325,9 @@ namespace Kim {
                 LastModifiedTime = CreatedTime;
             }
         }
+        void SetLastModifiedTime(const QDateTime& Time){
+            LastModifiedTime = Time;
+        }
         int GetFoldConnectionCount()const{return FoldConnectionCount;}
         void SetFoldConnectionCount(int FoldConnectionCount){
             this->FoldConnectionCount = FoldConnectionCount;
@@ -342,6 +342,19 @@ namespace Kim {
             return InConnections;
         }
 
+        QLinkedList<KConnectionController*> GetConnections(){
+            return GetOutConnections() + GetInConnections();
+        }
+
+        void SetPos(const QPointF& Pos){
+            this->GraphicsObject->setPos(Pos);
+        }
+
+        QPointF GetPos(){
+            return this->GraphicsObject->pos();
+        }
+
+        // only use for group & ungroup
         void RemoveOutConnection(KConnectionController* Controller){
             OutConnections.removeOne(Controller);
         }
@@ -350,8 +363,12 @@ namespace Kim {
             InConnections.removeOne(Controller);
         }
 
-        QLinkedList<KConnectionController*> GetConnections(){
-            return GetOutConnections() + GetInConnections();
+        void AddOutConnection(KConnectionController* Controller){
+            OutConnections.append(Controller);
+        }
+
+        void AddInConnection(KConnectionController* Controller){
+            InConnections.append(Controller);
         }
     };
     //////////////////////////////// Text Item ////////////////////////////////

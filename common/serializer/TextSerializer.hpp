@@ -108,8 +108,8 @@ if(Context.CurrentSerializer){\
             static void SerializeCanvas(KCanvasController* CanvasController, QTextStream& StreamOut, KContext& Context){
                 BEGIN_OBJECT;
 
-                const QList<KItemController*>& Items = CanvasController->ItemControlleres;
-                const QList<KConnectionController*>& Connections = CanvasController->ConnectionControlleres;
+                const auto& Items = CanvasController->ItemControlleres;
+                const auto& Connections = CanvasController->ConnectionControlleres;
                 Context.TotalProgress = Items.size() + Connections.size();
                 if(Context.CurrentSerializer){
                     emit Context.CurrentSerializer->TotalProgressSignal(Context.TotalProgress);
@@ -128,27 +128,29 @@ if(Context.CurrentSerializer){\
                 END_OBJECT;
             }
 
-            static void SerializeItems(const QList<KItemController*>& Items, QTextStream& StreamOut, KContext& Context){
+            static void SerializeItems(const QLinkedList<KItemController*>& Items, QTextStream& StreamOut, KContext& Context){
                 BEGIN_ARRAY;
 
-                for(int i = 0; i < Items.size(); i++){
+                auto Iter = Items.begin();
+                while(Iter != Items.end()){
                     StreamOut << Prefix;
-                    if(i != Items.size() - 1)Context.NeedComma = true;
-                    else Context.NeedComma = false;
-                    SerializeItem(Items[i], StreamOut, Context);
+                    Context.NeedComma = (Iter + 1 != Items.end());
+                    SerializeItem(*Iter, StreamOut, Context);
+                    ++Iter;
                 }
 
                 END_ARRAY;
             }
 
-            static void SerializeConnections(const QList<KConnectionController*>& Connections, QTextStream& StreamOut, KContext& Context){
+            static void SerializeConnections(const QLinkedList<KConnectionController*>& Connections, QTextStream& StreamOut, KContext& Context){
                 BEGIN_ARRAY;
 
-                for(int i = 0; i < Connections.size(); i++){
+                auto Iter = Connections.begin();
+                while(Iter != Connections.end()){
                     StreamOut << Prefix;
-                    if(i != Connections.size() - 1)Context.NeedComma = true;
-                    else Context.NeedComma = false;
-                    SerializeConnection(Connections[i], StreamOut, Context);
+                    Context.NeedComma = (Iter + 1 != Connections.end());
+                    SerializeConnection(*Iter, StreamOut, Context);
+                    ++Iter;
                 }
 
                 END_ARRAY;

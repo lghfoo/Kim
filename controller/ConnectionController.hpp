@@ -14,6 +14,7 @@ namespace Kim {
          * use to record the fold state of the item
          */
         // need serialize
+        qint64 Identity = CreateID();
         bool Collapsed = false;
     signals:
         void ConnectChangedSignal(KConnectionController* ConnectionController,
@@ -189,6 +190,14 @@ namespace Kim {
             delete ConnectionView;
         }
 
+        qint64 GetIdentity(){
+            return this->Identity;
+        }
+
+        void SetIdentity(qint64 Identity){
+            this->Identity = Identity;
+        }
+
         bool IsCollapsed(){
             return Collapsed;
         }
@@ -198,55 +207,77 @@ namespace Kim {
             this->GraphicsObject->setVisible(!Collapsed);
         }
 
-        void SetSrcItemController(KItemController* ItemController){
+        void SetSrcItemController(KItemController* ItemController, bool Connect = true){
             auto OldController = SrcItemController;
             if(OldController){
                 OldController->OutConnections.removeOne(this);
             }
             SrcItemController = ItemController;
             if(SrcItemController){
-                auto Pos = SrcItemController->GetView()->pos();
-                UpdateSrcPosition(Pos);
                 // 在没有Dst时，起始位置和结束位置相同
                 if(!DstItemController){
-                    UpdateDstPosition(Pos);
+                    UpdateDstPosition(SrcItemController->GetView()->pos());
                 }
-                QObject::connect(
-                            ItemController,
-                            &KItemController::PosChangedSignal,
-                            this,
-                            &KConnectionController::UpdateSrcPosition);
-                QObject::connect(
-                            SrcItemController,
-                            &KItemController::SizeChangedSignal,
-                            this,
-                            &KConnectionController::OnItemSizeChanged);
-                SrcItemController->OutConnections.append(this);
-                SrcItemController->UpdateMark();
+                if(Connect)
+                    ConnectSrcItem();
             }
             emit ConnectChangedSignal(this, OldController, SrcItemController);
         }
-        void SetDstItemController(KItemController* ItemController){
+        void SetDstItemController(KItemController* ItemController, bool Connect = true){
             auto OldController = DstItemController;
             if(OldController){
                 OldController->InConnections.removeOne(this);
             }
             DstItemController = ItemController;
             if(DstItemController){
-                UpdateDstPosition(DstItemController->GetView()->pos());
-                QObject::connect(
-                            ItemController,
-                            &KItemController::PosChangedSignal,
-                            this,
-                            &KConnectionController::UpdateDstPosition);
-                QObject::connect(
-                            DstItemController,
-                            &KItemController::SizeChangedSignal,
-                            this,
-                            &KConnectionController::OnItemSizeChanged);
-                DstItemController->InConnections.append(this);
+                if(Connect)
+                    ConnectDstItem();
             }
             emit ConnectChangedSignal(this, OldController, DstItemController);
+        }
+        void ConnectSrcItem(){
+            QObject::connect(
+                        SrcItemController,
+                        &KItemController::PosChangedSignal,
+                        this,
+                        &KConnectionController::UpdateSrcPosition);
+            QObject::connect(
+                        SrcItemController,
+                        &KItemController::SizeChangedSignal,
+                        this,
+                        &KConnectionController::OnItemSizeChanged);
+            SrcItemController->OutConnections.append(this);
+            SrcItemController->UpdateMark();
+            UpdateSrcPosition(SrcItemController->GetView()->pos());
+        }
+        void DisconnectDstItem(){
+            disconnect(DstItemController, nullptr, this, nullptr);
+            DstItemController->InConnections.removeOne(this);
+        }
+        void DisconnectSrcItem(){
+            disconnect(SrcItemController, nullptr, this, nullptr);
+            SrcItemController->OutConnections.removeOne(this);
+            SrcItemController->UpdateMark();
+        }
+        bool IsSrcConnected(){
+            return SrcItemController && SrcItemController->OutConnections.contains(this);
+        }
+        bool IsDstConnected(){
+            return DstItemController && DstItemController->InConnections.contains(this);
+        }
+        void ConnectDstItem(){
+            QObject::connect(
+                        DstItemController,
+                        &KItemController::PosChangedSignal,
+                        this,
+                        &KConnectionController::UpdateDstPosition);
+            QObject::connect(
+                        DstItemController,
+                        &KItemController::SizeChangedSignal,
+                        this,
+                        &KConnectionController::OnItemSizeChanged);
+            DstItemController->InConnections.append(this);
+            UpdateDstPosition(DstItemController->GetView()->pos());
         }
         KItemController* GetSrcItemController(){
             return SrcItemController;
