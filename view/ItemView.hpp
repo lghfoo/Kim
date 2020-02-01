@@ -132,12 +132,8 @@ namespace Kim {
         virtual void SetContent(const QString& Content) {Q_UNUSED(Content)}
         virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
             if(change == QGraphicsItem::GraphicsItemChange::ItemPositionHasChanged){
-//                qDebug()<<"now"<<this->pos()<<"new"<<value;
                 emit PosChangedSignal();
             }
-//            else if(change == QGraphicsItem::GraphicsItemChange::ItemPositionChange){
-////                qDebug()<<"now"<<this->pos()<<"new"<<value;
-//            }
             else if(change == QGraphicsItem::GraphicsItemChange::ItemSelectedHasChanged){
                 if(this->isSelected()){
                     this->setFocus(Qt::FocusReason::NoFocusReason);
@@ -147,7 +143,7 @@ namespace Kim {
         }
     protected:
         virtual void mouseMoveEvent(QGraphicsSceneMouseEvent *event)override{
-            if(event->modifiers() & Qt::ControlModifier){
+            if(event->buttons() & Qt::RightButton){
                 emit StartDragDropSignal();
                 QMimeData* Data = new QMimeData;
 

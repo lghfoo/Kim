@@ -54,9 +54,14 @@ namespace Kim {
                     CanvasController,
                     &KCanvasController::OnSpecialInput);
             connect(View,
-                    &KCanvasWrapperView::GroupToTextItem,
+                    &KCanvasWrapperView::GroupToTextItemSignal,
                     [=]{
                this->CanvasController->OnGroupToItem(KTextItemView::Type);
+            });
+            connect(View,
+                    &KCanvasWrapperView::GroupToImageItemSignal,
+                    [=]{
+                this->CanvasController->OnGroupToItem(KImageItemView::Type);
             });
         }
         ~KCanvasWrapperController(){
