@@ -19,6 +19,7 @@ namespace Kim {
         KCanvasWrapperView* View = new KCanvasWrapperView(CanvasController->GetCanvasView());
     public:
         KCanvasWrapperController(){
+            View->SetController(this);
             connect(CanvasController,
                     &KCanvasController::SaveSingal,
                     [=]{

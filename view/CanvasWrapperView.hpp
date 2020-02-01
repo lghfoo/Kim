@@ -3,6 +3,7 @@
 #include <QGridLayout>
 #include <QPushButton>
 #include<QWidget>
+#include <QDesktopWidget>
 #include"CanvasView.hpp"
 #include"ToolView/SpecialInputView.hpp"
 #include"ToolView/HelpView.hpp"
@@ -18,16 +19,31 @@ namespace Kim {
         void SaveCanvasAsSignal();
         void GroupToTextItemSignal();
         void GroupToImageItemSignal();
+        void CloseSignal();
     private:
         QWidget* ToolWidget = new QWidget;
         KCanvasView* CanvasView = nullptr;
         KSpecialInputView* SpecialInputView = new KSpecialInputView;
         KHelpView* HelpView = new KHelpView;
+        KCanvasWrapperController* Controller = nullptr;
     protected:
         virtual void resizeEvent(QResizeEvent* Event)override{
             QWidget::resizeEvent(Event);
 //            ToolWidget->resize(this->width(), this->height());
 //            UpdateMask();
+        }
+
+        virtual void closeEvent(QCloseEvent* Event)override{
+            Event->ignore();
+            emit CloseSignal();
+        }
+
+
+        virtual void keyPressEvent(QKeyEvent* Event)override{
+            if(Event->key() == Qt::Key_Escape){
+                ToolWidget->setVisible(!ToolWidget->isVisible());
+            }
+            QWidget::keyPressEvent(Event);
         }
     public:
         KCanvasWrapperView(KCanvasView* CanvasView):CanvasView(CanvasView){
@@ -114,5 +130,19 @@ namespace Kim {
             }
             ToolWidget->setMask(Region);
         }
+
+        void SetController(KCanvasWrapperController* Controller){
+            this->Controller = Controller;
+        }
+
+        void MoveToScreenCenter()
+        {
+            move(qApp->desktop()->availableGeometry(this).center()-rect().center());
+        }
+
+        KCanvasWrapperController* GetController(){
+            return this->Controller;
+        }
+
     };
 }

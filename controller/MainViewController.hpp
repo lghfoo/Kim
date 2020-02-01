@@ -5,6 +5,7 @@ namespace Kim {
     class KSerializer;
     class KDBSerializer;
     class KTextSerializer;
+
     class KMainViewController : public QObject{
         friend class KSerializer;
         friend class KDBSerializer;
@@ -43,12 +44,26 @@ namespace Kim {
             });
             connect(MainView->CanvasTabs, &QTabWidget::currentChanged,
                     [=](int Index){
-                for(auto Wrapper : CanvasWrapperControllers){
-                    if(Wrapper->GetView() == MainView->CanvasTabs->widget(Index)){
-                        this->ActiveCanvasWrapper = Wrapper;
-                        break;
-                    }
+                if(Index >= 0){
+                    auto Widget = static_cast<KCanvasWrapperView*>(MainView->CanvasTabs->widget(Index));
+                    this->ActiveCanvasWrapper = Widget->GetController();
                 }
+            });
+            connect(MainView->CanvasTabs, &QTabWidget::tabBarDoubleClicked,
+                    [=](int Index){
+                auto Widget = static_cast<KCanvasWrapperView*>(MainView->CanvasTabs->widget(Index));
+                MainView->CanvasTabs->removeTab(Index);
+                Widget->setParent(MainView, Qt::Window);
+                Widget->setWindowFlag(Qt::WindowStaysOnTopHint);
+                Widget->MoveToScreenCenter();
+                Widget->show();
+                connect(Widget, &KCanvasWrapperView::CloseSignal,
+                        [=]{
+                    Widget->setWindowFlag(Qt::WindowStaysOnTopHint, false);
+                    Widget->setParent(MainView->CanvasTabs);
+                    MainView->CanvasTabs->addTab(Widget, Widget->GetController()->GetCanvasName());
+                    disconnect(Widget, &KCanvasWrapperView::CloseSignal, 0, 0);
+                });
             });
             this->MainView->setCentralWidget(MainView->CanvasTabs);
             connect(UpdateStatusBarTimer,

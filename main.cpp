@@ -13,9 +13,13 @@ int main(int argc, char *argv[])
 // Done:
 // 28、多场景管理
 // 8、scroll到指点item: QGraphicsView自带centerOn方法可以实现scroll到指点item
-
+// 40、extract canvas to top windows: float tab widget
+// 16、修复折叠+group保存时parameter count mismatch的bug：insert group少了')'
 
 // TODO:
+// 39、修复多canvs时save到同一文件的bug
+// 40、main view hide的时候保持弹出来的widget不要hide
+// 41、升级group，保存group的信息，不要在ungroup时丢失。
 // 15、修复Item缩放时场景像素残留bug：bounding有问题: 放大场景，频繁点击并拖动场景，光标还有残影
 // 35、id管理
 // 30、节点引用场景
@@ -37,6 +41,7 @@ int main(int argc, char *argv[])
 // 35、重构sql语句
 // 36、选择某条路径expand
 // 37、group in out connection
+// 38、close console, redirect log to file
 
 //////////////////////////////// 2020/1/31 10:33 ////////////////////////////////
 // Done:

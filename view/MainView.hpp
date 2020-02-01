@@ -26,7 +26,9 @@ namespace Kim {
             QMainWindow::showEvent(Event);
             emit ShowSignal();
         }
+
     public:
+
         KMainView(){
             this->setWindowTitle("Kim-Keep Everything in Mind");
             this->resize(800, 600);
@@ -54,6 +56,5 @@ namespace Kim {
             LeftDoc->setWidget(BtnWidget);
             this->addDockWidget(Qt::DockWidgetArea::LeftDockWidgetArea, LeftDoc);
         }
-
     };
 }

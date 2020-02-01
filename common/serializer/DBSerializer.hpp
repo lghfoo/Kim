@@ -190,7 +190,7 @@ namespace Kim {
 
         void InsertGroups(const QList<KItemGroupController*>& Groups, QSqlQuery& Query,
                           const QVariant& CanvasID){
-            QString GroupPrepare = QString("INSERT INTO ItemGroup VALUES (:GroupItemID, :PosWhenGrouping, :CanvasID");
+            QString GroupPrepare = QString("INSERT INTO ItemGroup VALUES (:GroupItemID, :PosWhenGrouping, :CanvasID)");
             Query.prepare(GroupPrepare);
             for(auto Group : Groups){
                 Query.bindValue(":GroupItemID", Group->GetGroupID());
