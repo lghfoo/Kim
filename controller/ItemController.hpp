@@ -392,6 +392,7 @@ namespace Kim {
                 ItemView->SetText(Dialog->GetText());
                 Dialog->close();
             });
+            Dialog->setWindowFlag(Qt::WindowStaysOnTopHint);
             Dialog->show();
             return;
         }

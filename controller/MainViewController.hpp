@@ -16,9 +16,8 @@ namespace Kim {
         void SaveAsProjectSignal();
         void OpenProjectSignal();
         void OpenCanvasSignal();
-        void LoadCanvasSignal(KCanvasController*);
-        void SaveCanvasSignal(KCanvasController*);
-        void SaveAsCanvasSignal(KCanvasController*);
+        void LoadCanvasSignal(KCanvasController*, const QString&);
+        void SaveCanvasSignal(KCanvasController*, const QString&);
     public slots:
         void OnNewCanvas(){
             CreateAndChangeActive();
@@ -105,8 +104,6 @@ namespace Kim {
         void Connect(KCanvasWrapperController* Controller){
             connect(Controller, &KCanvasWrapperController::SaveSignal,
                     this, &KMainViewController::SaveCanvasSignal);
-            connect(Controller, &KCanvasWrapperController::SaveAsSignal,
-                    this, &KMainViewController::SaveAsCanvasSignal);
             connect(Controller, &KCanvasWrapperController::LoadSignal,
                     this, &KMainViewController::LoadCanvasSignal);
         }
@@ -193,6 +190,16 @@ namespace Kim {
                         .arg(MoveTargetType)
                         .arg(AddPosType)
                         .arg(WriteDirect);
+            }
+            // todo: refactor.
+            for(auto Wrapper : CanvasWrapperControllers){
+                int Index = MainView->CanvasTabs->indexOf(Wrapper->GetView());
+                auto Name = Wrapper->GetSavedCanvasFilename();
+                if(!Name.isEmpty()){
+                    Name = QFileInfo(Name).fileName();
+                    Wrapper->SetCanvasName(Name);
+                    MainView->CanvasTabs->setTabText(Index, Name);
+                }
             }
             MainView->statusBar()->showMessage(Message);
         }

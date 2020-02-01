@@ -10,11 +10,31 @@ namespace Kim {
     class KCanvasWrapperController : public QObject{
         Q_OBJECT
     signals:
-        void SaveSignal(KCanvasController* Canvas);
-        void SaveAsSignal(KCanvasController* Canvas);
-        void LoadSignal(KCanvasController* Canvas);
+        void SaveSignal(KCanvasController* Canvas, const QString& Filename);
+        void LoadSignal(KCanvasController* Canvas, const QString& Filename);
     public slots:
+        //////////////////////////////// Canvas ////////////////////////////////
+        void OnSaveCanvas(){
+            if(SavedCanvasFilename.isEmpty())OnSaveCanvasAs();
+            else emit SaveSignal(CanvasController, SavedCanvasFilename);
+        }
+
+        void OnLoadCanvas(){
+            const QString& LoadFilename = QFileDialog::getOpenFileName(View, QObject::tr("Load Kim Canvas"),
+                                      QFileInfo(SavedCanvasFilename).absolutePath(), QObject::tr("Kim Files (*.kim)"));
+            if(LoadFilename.isEmpty())return;
+            SavedCanvasFilename = LoadFilename;
+            emit LoadSignal(CanvasController, LoadFilename);
+        }
+
+        void OnSaveCanvasAs(){
+            SavedCanvasFilename = QFileDialog::getSaveFileName(View, QObject::tr("Save Kim Canvas"),
+                                                         QFileInfo(SavedCanvasFilename).absolutePath(), QObject::tr("Kim Files (*.kim)"));
+            if(SavedCanvasFilename.isEmpty())return;
+            emit SaveSignal(CanvasController, SavedCanvasFilename);
+        }
     private:
+        QString SavedCanvasFilename = "";
         KCanvasController* CanvasController = new KCanvasController;
         KCanvasWrapperView* View = new KCanvasWrapperView(CanvasController->GetCanvasView());
     public:
@@ -22,34 +42,28 @@ namespace Kim {
             View->SetController(this);
             connect(CanvasController,
                     &KCanvasController::SaveSingal,
-                    [=]{
-                emit SaveSignal(CanvasController);
-            });
+                    this,
+                    &KCanvasWrapperController::OnSaveCanvas);
             connect(CanvasController,
                     &KCanvasController::SaveAsSignal,
-                    [=]{
-                emit SaveAsSignal(CanvasController);
-            });
+                    this,
+                    &KCanvasWrapperController::OnSaveCanvasAs);
             connect(CanvasController,
                     &KCanvasController::LoadSignal,
-                    [=]{
-                emit LoadSignal(CanvasController);
-            });
+                    this,
+                    &KCanvasWrapperController::OnLoadCanvas);
             connect(View,
                     &KCanvasWrapperView::SaveCanvasSignal,
-                    [=]{
-                emit SaveSignal(CanvasController);
-            });
+                    this,
+                    &KCanvasWrapperController::OnSaveCanvas);
             connect(View,
                     &KCanvasWrapperView::SaveCanvasAsSignal,
-                    [=]{
-                emit SaveAsSignal(CanvasController);
-            });
+                    this,
+                    &KCanvasWrapperController::OnSaveCanvasAs);
             connect(View,
                     &KCanvasWrapperView::LoadCanvasSignal,
-                    [=]{
-               emit LoadSignal(CanvasController);
-            });
+                    this,
+                    &KCanvasWrapperController::OnLoadCanvas);
             connect(View,
                     &KCanvasWrapperView::SpecialInputSignal,
                     CanvasController,
@@ -68,6 +82,9 @@ namespace Kim {
         ~KCanvasWrapperController(){
             delete View;
             delete CanvasController;
+        }
+        QString GetSavedCanvasFilename(){
+            return SavedCanvasFilename;
         }
         QWidget* GetView(){
             return View;

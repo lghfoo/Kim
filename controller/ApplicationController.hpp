@@ -15,7 +15,7 @@ namespace Kim {
 
         void OnOpenProject(){
             const QString& OpenFilename = QFileDialog::getOpenFileName(MainViewController->GetMainView(), QObject::tr("Open Kim Project"),
-                                      QFileInfo(SavedCanvasFilename).absolutePath(), QObject::tr("Kim Files (*.kim)"));
+                                      QFileInfo(SavedProjectFilename).absolutePath(), QObject::tr("Kim Files (*.kim)"));
             if(OpenFilename.isEmpty())return;
             OpenProjectHelper(MainViewController, OpenFilename);
         }
@@ -29,39 +29,29 @@ namespace Kim {
 
         void OnOpenCanvas(){
             const QString& OpenFilename = QFileDialog::getOpenFileName(MainViewController->GetMainView(), QObject::tr("Open Kim Canvas"),
-                                      QFileInfo(SavedCanvasFilename).absolutePath(), QObject::tr("Kim Files (*.kim)"));
+                                      QFileInfo(SavedProjectFilename).absolutePath(), QObject::tr("Kim Files (*.kim)"));
             if(OpenFilename.isEmpty())return;
             OpenCanvasHelper(OpenFilename);
         }
 
-        //////////////////////////////// Canvas ////////////////////////////////
-        void OnSaveCanvas(KCanvasController* Canvas){
-            if(SavedCanvasFilename.isEmpty())OnSaveCanvasAs(Canvas);
-            else SaveCanvasHelper(Canvas, SavedCanvasFilename);
+        void OnSaveCanvas(KCanvasController* Canvas, const QString& Filename){
+            KDBSerializer Serializer(Filename);
+            connect(&Serializer,
+                    &KSerializer::FinishedSignal,
+                    []{
+                QMessageBox msgBox;
+                msgBox.setText("Saved.");
+                msgBox.exec();
+            });
+            Serializer.Serialize(Canvas);
         }
 
-        void OnLoadCanvas(KCanvasController* Canvas){
-            const QString& LoadFilename = QFileDialog::getOpenFileName(MainViewController->GetMainView(), QObject::tr("Load Kim Canvas"),
-                                      QFileInfo(SavedCanvasFilename).absolutePath(), QObject::tr("Kim Files (*.kim)"));
-            if(LoadFilename.isEmpty())return;
-//            QFileInfo FileInfo(LoadFilename);
-//            LastLoadDir = FileInfo.absolutePath();
-//            LastSavedDir = LastLoadDir;
-            SavedCanvasFilename = LoadFilename;
-            LoadCanvasHelper(Canvas, LoadFilename);
-        }
-
-        void OnSaveCanvasAs(KCanvasController* Canvas){
-            SavedCanvasFilename = QFileDialog::getSaveFileName(MainViewController->GetMainView(), QObject::tr("Save Kim Canvas"),
-                                                         QFileInfo(SavedCanvasFilename).absolutePath(), QObject::tr("Kim Files (*.kim)"));
-            if(SavedCanvasFilename.isEmpty())return;
-//            QFileInfo FileInfo(SavedFilename);
-//            LastSavedDir = FileInfo.absolutePath();
-            SaveCanvasHelper(Canvas, SavedCanvasFilename);
+        void OnLoadCanvas(KCanvasController* Canvas, const QString& Filename){
+            KDBSerializer Serilizer(Filename);
+            Serilizer.Deserialize(Canvas);
         }
     private:
         KMainViewController* MainViewController = new KMainViewController;
-        QString SavedCanvasFilename = "";
         QString SavedProjectFilename = "";
     public:
         KApplicationController(){
@@ -70,7 +60,6 @@ namespace Kim {
             connect(MainViewController, &KMainViewController::OpenProjectSignal, this, &KApplicationController::OnOpenProject);
             connect(MainViewController, &KMainViewController::OpenCanvasSignal, this, &KApplicationController::OnOpenCanvas);
             connect(MainViewController, &KMainViewController::SaveCanvasSignal, this, &KApplicationController::OnSaveCanvas);
-            connect(MainViewController, &KMainViewController::SaveAsCanvasSignal, this, &KApplicationController::OnSaveCanvasAs);
             connect(MainViewController, &KMainViewController::LoadCanvasSignal, this, &KApplicationController::OnLoadCanvas);
         }
         static void Startup(){
@@ -98,25 +87,9 @@ namespace Kim {
         void OpenCanvasHelper(const QString& Filename){
             auto CanvasWrapper = MainViewController->CreateCanvasWrapper();
             auto Canvas = CanvasWrapper->GetCanvasController();
-            LoadCanvasHelper(Canvas, Filename);
+            OnLoadCanvas(Canvas, Filename);
             MainViewController->AddCanvasWrapper(CanvasWrapper);
-        }
-
-        void SaveCanvasHelper(KCanvasController* Canvas, const QString& Filename){
-            KDBSerializer Serializer(Filename);
-            connect(&Serializer,
-                    &KSerializer::FinishedSignal,
-                    []{
-                QMessageBox msgBox;
-                msgBox.setText("Saved.");
-                msgBox.exec();
-            });
-            Serializer.Serialize(Canvas);
-        }
-
-        void LoadCanvasHelper(KCanvasController* Canvas, const QString& Filename){
-            KDBSerializer Serilizer(Filename);
-            Serilizer.Deserialize(Canvas);
+            MainViewController->ChangeActiveWrapper(CanvasWrapper);
         }
 
     };
