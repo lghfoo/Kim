@@ -6,54 +6,49 @@
 #include"../view/CanvasWrapperView.hpp"
 #include"CanvasController.hpp"
 #include<QDockWidget>
-#include"../common/serializer/TextSerializer.hpp"
-#include"../common/serializer/DBSerializer.hpp"
 namespace Kim {
     class KCanvasWrapperController : public QObject{
         Q_OBJECT
+    signals:
+        void SaveSignal(KCanvasController* Canvas);
+        void SaveAsSignal(KCanvasController* Canvas);
+        void LoadSignal(KCanvasController* Canvas);
     public slots:
-        void Save(){
-            if(SavedFilename.isEmpty())SaveAs();
-            else SaveFileHelper(SavedFilename);
-        }
-
-        void Load(){
-            const QString& LoadFilename = QFileDialog::getOpenFileName(View, QObject::tr("Load Kim File"),
-                                      LastLoadDir, QObject::tr("Kim Files (*.kim)"));
-            if(LoadFilename.isEmpty())return;
-            QFileInfo FileInfo(LoadFilename);
-            LastLoadDir = FileInfo.absolutePath();
-            LoadFileHelper(LoadFilename);
-        }
-
-        void SaveAs(){
-            SavedFilename = QFileDialog::getSaveFileName(View, QObject::tr("Save Kim File"),
-                                                         LastSavedDir, QObject::tr("Kim Files (*.kim)"));
-            if(SavedFilename.isEmpty())return;
-            QFileInfo FileInfo(SavedFilename);
-            LastSavedDir = FileInfo.absolutePath();
-            SaveFileHelper(SavedFilename);
-        }
     private:
         KCanvasController* CanvasController = new KCanvasController;
         KCanvasWrapperView* View = new KCanvasWrapperView(CanvasController->GetCanvasView());
-        QString SavedFilename = "";
-        QString LastSavedDir = "";
-        QString LastLoadDir = "";
     public:
         KCanvasWrapperController(){
             connect(CanvasController,
                     &KCanvasController::SaveSingal,
-                    this,
-                    &KCanvasWrapperController::Save);
+                    [=]{
+                emit SaveSignal(CanvasController);
+            });
             connect(CanvasController,
                     &KCanvasController::SaveAsSignal,
-                    this,
-                    &KCanvasWrapperController::SaveAs);
+                    [=]{
+                emit SaveAsSignal(CanvasController);
+            });
             connect(CanvasController,
                     &KCanvasController::LoadSignal,
-                    this,
-                    &KCanvasWrapperController::Load);
+                    [=]{
+                emit LoadSignal(CanvasController);
+            });
+            connect(View,
+                    &KCanvasWrapperView::SaveCanvasSignal,
+                    [=]{
+                emit SaveSignal(CanvasController);
+            });
+            connect(View,
+                    &KCanvasWrapperView::SaveCanvasAsSignal,
+                    [=]{
+                emit SaveAsSignal(CanvasController);
+            });
+            connect(View,
+                    &KCanvasWrapperView::LoadCanvasSignal,
+                    [=]{
+               emit LoadSignal(CanvasController);
+            });
             connect(View,
                     &KCanvasWrapperView::SpecialInputSignal,
                     CanvasController,
@@ -63,6 +58,10 @@ namespace Kim {
                     [=]{
                this->CanvasController->OnGroupToItem(KTextItemView::Type);
             });
+        }
+        ~KCanvasWrapperController(){
+            delete View;
+            delete CanvasController;
         }
         QWidget* GetView(){
             return View;
@@ -75,22 +74,6 @@ namespace Kim {
         }
         void SetCanvasName(const QString& Name){
             CanvasController->SetCanvasName(Name);
-        }
-        void SaveFileHelper(const QString& Filename){
-            KDBSerializer Serializer(Filename);
-            connect(&Serializer,
-                    &KSerializer::FinishedSignal,
-                    []{
-                QMessageBox msgBox;
-                msgBox.setText("Saved.");
-                msgBox.exec();
-            });
-            Serializer.Serialize(CanvasController, Filename);
-        }
-
-        void LoadFileHelper(const QString& Filename){
-            KDBSerializer Serilizer(Filename);
-            Serilizer.Deserialize(Filename, CanvasController);
         }
     };
 }

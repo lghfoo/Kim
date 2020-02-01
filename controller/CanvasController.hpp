@@ -404,6 +404,22 @@ namespace Kim {
 
         }
 
+        ~KCanvasController(){
+            Clear();
+        }
+
+        void Clear(){
+            while(!ItemControlleres.isEmpty()){
+                auto Item = ItemControlleres.front();
+                ItemControlleres.pop_front();
+                delete Item;
+            }
+            ItemControlleres.clear();
+            SelectedControlleres.clear();
+            GroupControlleres.clear();
+            ConnectionControlleres.clear();
+        }
+
         qint64 GetCanvasID()const{
             return this->CanvasID;
         }
@@ -853,10 +869,6 @@ namespace Kim {
 
         void DeleteItem(KItemController* Controller){
             delete Controller;
-        }
-
-        void DeleteGroupItem(KItemController* Controller){
-
         }
 
         void DeleteConnection(KConnectionController* Controller){

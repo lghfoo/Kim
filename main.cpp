@@ -9,6 +9,34 @@ int main(int argc, char *argv[])
     return a.exec();
 }
 
+//////////////////////////////// 2020/1/31 10:33 ////////////////////////////////
+// Done:
+// 28、多场景管理
+// 8、scroll到指点item: QGraphicsView自带centerOn方法可以实现scroll到指点item
+
+
+// TODO:
+// 15、修复Item缩放时场景像素残留bug：bounding有问题: 放大场景，频繁点击并拖动场景，光标还有残影
+// 35、id管理
+// 30、节点引用场景
+// 5、group选中的connection
+// 13、文本序列化，添加对折叠的处理
+// 10、connection支持文本输入
+// 11、工具面板
+// 16、ImageItem Format
+// 17、Text item cache bounding
+// 24、复制、剪切节点、连接
+// 25、connection属性面板
+// 26、item属性面板
+// 27、使用lz4压缩图片数据
+// 29、焦点管理并更新选择孩子操作（现在是从item和connection发出signal来进行选择，期望改成从canvs的keyPress事件中根据焦点进行选择）
+// 31、snap to grid
+// 34、DB:保存到一个已存在的文件时清空文件
+// 21、重构Serializer
+// 23、重构Mime
+// 35、重构sql语句
+// 36、选择某条路径expand
+// 37、group in out connection
 
 //////////////////////////////// 2020/1/31 10:33 ////////////////////////////////
 // Done:

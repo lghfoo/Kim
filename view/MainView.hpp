@@ -13,23 +13,32 @@ namespace Kim {
         friend class KMainViewController;
     signals:
         void SaveProjectSignal();
+        void SaveAsProjectSignal();
         void OpenProjectSignal();
-        void NewCanvasSignal();
         void OpenCanvasSignal();
+        void NewCanvasSignal();
+        void ShowSignal();
     private:
         QStatusBar* StatusBar = new QStatusBar;
         QTabWidget* CanvasTabs = new QTabWidget;
+    protected:
+        virtual void showEvent(QShowEvent* Event) override{
+            QMainWindow::showEvent(Event);
+            emit ShowSignal();
+        }
     public:
         KMainView(){
             this->setWindowTitle("Kim-Keep Everything in Mind");
             this->resize(800, 600);
             this->setStatusBar(StatusBar);
 
-            QPushButton* SaveProjBtn = new QPushButton(tr("Save Proj"));
-            QPushButton* OpenProjBtn = new QPushButton(tr("Open Proj"));
+            QPushButton* SaveProjBtn = new QPushButton(tr("Save Project"));
+            QPushButton* SaveAsProjBtn = new QPushButton(tr("Save Project As..."));
+            QPushButton* OpenProjBtn = new QPushButton(tr("Open Project"));
             QPushButton* AddCanvasBtn = new QPushButton(tr("New Canvas"));
             QPushButton* OpenCanvasBtn = new QPushButton(tr("Open Canvas"));
             connect(SaveProjBtn, &QPushButton::clicked, this, &KMainView::SaveProjectSignal);
+            connect(SaveAsProjBtn, &QPushButton::clicked, this, &KMainView::SaveAsProjectSignal);
             connect(OpenProjBtn, &QPushButton::clicked, this, &KMainView::OpenProjectSignal);
             connect(AddCanvasBtn, &QPushButton::clicked, this, &KMainView::NewCanvasSignal);
             connect(OpenCanvasBtn, &QPushButton::clicked, this, &KMainView::OpenCanvasSignal);
@@ -45,5 +54,6 @@ namespace Kim {
             LeftDoc->setWidget(BtnWidget);
             this->addDockWidget(Qt::DockWidgetArea::LeftDockWidgetArea, LeftDoc);
         }
+
     };
 }

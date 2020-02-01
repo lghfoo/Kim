@@ -192,10 +192,11 @@ namespace Kim {
     signals:
         void KeyPressSignal(QKeyEvent* event);
     protected:
-        virtual void showEvent(QShowEvent *event) override{
-            this->ScrollToCenter();
-            QGraphicsView::showEvent(event);
-        }
+//        virtual void showEvent(QShowEvent *event) override{
+//            qDebug()<<"show event";
+//            QGraphicsView::showEvent(event);
+//            this->ScrollToCenter();
+//        }
 
         virtual bool event(QEvent *event)override{
             if(event->type() == QEvent::KeyPress){
@@ -248,7 +249,6 @@ namespace Kim {
         }
     public:
         KCanvasView(){
-            this->setScene(Scene);
             const int SceneSize = 65536;
             Scene->setSceneRect(
                         -SceneSize / 2,
@@ -256,6 +256,7 @@ namespace Kim {
                         SceneSize,
                         SceneSize
                         );
+            this->setScene(Scene);
             setDragMode(QGraphicsView::DragMode::RubberBandDrag);
             this->setRenderHint(QPainter::Antialiasing);
         }
@@ -267,13 +268,15 @@ namespace Kim {
         static void ScrollToCenter(QScrollBar* Bar){
             int Min = Bar->minimum();
             int Max = Bar->maximum();
-            int Len = Bar->pageStep();
+//            qDebug()<<Min<<Max;
+//            int Len = Bar->pageStep();
             Bar->setValue((Max + Min) / 2);
         }
 
         void ScrollToCenter(){
-            ScrollToCenter(this->verticalScrollBar());
-            ScrollToCenter(this->horizontalScrollBar());
+            this->centerOn(0, 0);
+//            ScrollToCenter(this->verticalScrollBar());
+//            ScrollToCenter(this->horizontalScrollBar());
         }
 
         void ToggleDragMode(){

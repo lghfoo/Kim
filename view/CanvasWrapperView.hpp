@@ -15,6 +15,7 @@ namespace Kim {
         void SpecialInputSignal(const QString& Text);
         void SaveCanvasSignal();
         void LoadCanvasSignal();
+        void SaveCanvasAsSignal();
         void GroupToTextItem();
         void GroupToImageItem();
     private:
@@ -32,8 +33,8 @@ namespace Kim {
         KCanvasWrapperView(KCanvasView* CanvasView):CanvasView(CanvasView){
             QLayout* Layout = new QHBoxLayout;
             Layout->addWidget(CanvasView);
-            this->setLayout(Layout);
             Layout->addWidget(ToolWidget);
+            this->setLayout(Layout);
 
             QLayout* ToolLayout = new QVBoxLayout;
             ToolWidget->setLayout(ToolLayout);
@@ -41,29 +42,35 @@ namespace Kim {
             QPushButton* ShowSpecialInputBtn = new QPushButton(tr("Special Input"));
             QPushButton* LoadCanvasBtn = new QPushButton(tr("Load Canvas"));
             QPushButton* SaveCanvasBtn = new QPushButton(tr("Save Canvas"));
+            QPushButton* SaveCanvasAsBtn = new QPushButton(tr("Save Canvas As"));
             QPushButton* GroupToTextBtn = new QPushButton(tr("Group To Text"));
+            auto Clicked = &QPushButton::clicked;
             connect(ShowHelpBtn,
-                    &QPushButton::clicked,
+                    Clicked,
                     [=]{
                 HelpView->setWindowFlag(Qt::WindowStaysOnTopHint);
                 HelpView->show();
             });
             connect(ShowSpecialInputBtn,
-                    &QPushButton::clicked,
+                    Clicked,
                     [=]{
                 SpecialInputView->setWindowFlag(Qt::WindowStaysOnTopHint);
                 SpecialInputView->show();
             });
             connect(LoadCanvasBtn,
-                    &QPushButton::clicked,
+                    Clicked,
                     this,
                     &KCanvasWrapperView::LoadCanvasSignal);
             connect(SaveCanvasBtn,
-                    &QPushButton::clicked,
+                    Clicked,
                     this,
                     &KCanvasWrapperView::SaveCanvasSignal);
+            connect(SaveCanvasAsBtn,
+                    Clicked,
+                    this,
+                    &KCanvasWrapperView::SaveCanvasAsSignal);
             connect(GroupToTextBtn,
-                    &QPushButton::clicked,
+                    Clicked,
                     this,
                     &KCanvasWrapperView::GroupToTextItem);
 
@@ -71,6 +78,7 @@ namespace Kim {
             ToolLayout->addWidget(ShowSpecialInputBtn);
             ToolLayout->addWidget(LoadCanvasBtn);
             ToolLayout->addWidget(SaveCanvasBtn);
+            ToolLayout->addWidget(SaveCanvasAsBtn);
             ToolLayout->addWidget(GroupToTextBtn);
             ToolLayout->setAlignment(Qt::AlignTop);
 

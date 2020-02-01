@@ -205,15 +205,6 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                 BEGIN_OBJECT;
 
                 CommonOut(Item, Item->GetView(), StreamOut, Prefix);
-//                KTextItemController* ItemController = static_cast<KTextItemController*>(Item);
-//                KTextItemView* ItemView = static_cast<KTextItemView*>(Item->GetView());
-//                OUT("Type", ItemView->GetTypeAsString());
-//                OUT("Identity", Item->Identity);
-//                OUT("Alias", Item->Alias);
-//                OUT("CreatedAt", Item->CreatedTime.toString(NormalTimeFormat));
-//                OUT("LastModifiedAt", Item->LastModifiedTime.toString(NormalTimeFormat));
-//                OUT("Position", QString("%1, %2").arg(ItemView->pos().x()).arg(ItemView->pos().y()));
-//                OUT("Content", ToEscapedString(ItemView->GetContent()));
 
                 END_OBJECT;
             }
@@ -222,15 +213,6 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                 BEGIN_OBJECT;
 
                 CommonOut(Item, Item->GetView(), StreamOut, Prefix);
-//                KImageItemController* ItemController = static_cast<KImageItemController*>(Item);
-//                KImageItemView* ItemView = static_cast<KImageItemView*>(Item->GetView());
-//                OUT("Type", ItemView->GetTypeAsString());
-//                OUT("Identity", Item->Identity);
-//                OUT("Alias", Item->Alias);
-//                OUT("CreatedAt", Item->CreatedTime.toString(NormalTimeFormat));
-//                OUT("LastModifiedAt", Item->LastModifiedTime.toString(NormalTimeFormat));
-//                OUT("Position", QString("%1, %2").arg(ItemView->pos().x()).arg(ItemView->pos().y()));
-//                OUT("Content", ToEscapedString(ItemView->GetContent()));
 
                 END_OBJECT;
             }
@@ -445,16 +427,6 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                                     else if(Context.KeyToken == "Content"){
                                         auto ItemView = Context.CurrentItemController->GetView();
                                         ItemView->SetContent(Context.ValueToken);
-//                                        auto Graphics = Context.CurrentItemController->GetView();
-//                                        switch (Graphics->type()) {
-//                                        case KTextItemView::Type:
-//                                            qgraphicsitem_cast<KTextItemView*>(Graphics)
-//                                                    ->SetText(Context.ValueToken);
-//                                            break;
-//                                        default:
-//                                            qDebug()<<"error: unkown item type to set content"<<Context.DetailError(Char);
-//                                            break;
-//                                        }
                                     }
                                     else if(Context.KeyToken == "Position"){
                                         QStringList StrList = Context.ValueToken.split(',');
@@ -471,7 +443,6 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                                 }
                                 else{
                                     if(Context.KeyToken == "Type"){
-//                                        qInfo()<<"info: creating controller of type: " + Context.ValueToken;
                                         if(Context.ValueToken == "TextItem"){
                                             Context.CurrentItemController = CanvasController
                                                     ->CreateAndAddItemController(KTextItemView::Type);
@@ -595,10 +566,14 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
     private:
         KContext Context;
     public:
-        virtual void Serialize(KCanvasController* CanvasController, const QString& OutputPath) override{
+        KTextSerializer(const QString& Path):KSerializer(Path){
+
+        }
+
+        virtual void Serialize(KCanvasController* CanvasController) override{
             Context.Reset();
             Context.CurrentSerializer = this;
-            QFile OutputFile(OutputPath);
+            QFile OutputFile(Path);
             if (OutputFile.open(QFile::WriteOnly | QFile::Truncate)) {
                 QTextStream OutStream(&OutputFile);
                 OutStream.setCodec(QTextCodec::codecForName("utf-8"));
@@ -610,10 +585,10 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
             }
         }
 
-        virtual void Deserialize(const QString& InputPath, KCanvasController* CanvasController, const QVariant& CanvasID = QVariant()) override{
+        virtual void Deserialize(KCanvasController* CanvasController, const QVariant& CanvasID = QVariant()) override{
             Context.Reset();
             Context.CurrentSerializer = this;
-            QFile InputFile(InputPath);
+            QFile InputFile(Path);
             if(InputFile.open(QFile::ReadOnly)){
                 QTextStream InStream(&InputFile);
                 InStream.setCodec(QTextCodec::codecForName("utf-8"));
@@ -621,8 +596,16 @@ StreamOut << Prefix << (KEY) << " : \"" << (VALUE) <<"\"\n"
                 InputFile.close();
             }
             else{
-                qDebug()<<QString("open file \"%1\" fail.").arg(InputPath);
+                qDebug()<<QString("open file \"%1\" fail.").arg(Path);
             }
+        }
+
+        virtual void Serialize(KMainViewController* MainController) override{
+
+        }
+
+        virtual void Deserialize(KMainViewController* MainController) override{
+
         }
 
         static QString ToEscapedString(const QString& String){

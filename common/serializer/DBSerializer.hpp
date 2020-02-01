@@ -6,31 +6,110 @@ namespace Kim {
     private:
         bool NeedRecreateTable = true;
         bool UseTransaction = true;
+        bool EmitFinishedSignal = true;
         const QString ConnectionName = "Kim DBSerializer";
-        QString DatabaseName = "";
+
         void CheckResult(bool Result, const QSqlQuery& Query){
             if(!Result){
                 qDebug()<<Query.lastError();
             }
         }
+
         QString PointToString(const QPointF& Point){
             return QString("%1, %2").arg(Point.x()).arg(Point.y());
         }
+
         QChar BoolToChar(bool Bool){
             return Bool? QChar('Y') : QChar('N');
         }
+
         QPointF PointFromString(const QString& Point){
             auto List = Point.split(',');
             return QPointF(List[0].trimmed().toDouble(), List[1].trimmed().toDouble());
         }
+
         bool BoolFromString(const QString& String){
             return String == QString("Y")? true : false;
         }
+
         QString GroupIDToString(const QVariant& GroupID){
             return GroupID.isNull()? "is null" : QString("=") + QString::number(GroupID.toLongLong());
         }
+
         QString CanvasIDToString(const QVariant& CanvasID){
             return QString::number(CanvasID.toLongLong());
+        }
+
+        ////////////////////////////////////////////////////////////////
+        /// Serialize
+        ////////////////////////////////////////////////////////////////
+        void RecreateTable(QSqlQuery& Query){
+            bool Result = true;
+            // Drop Table
+            Result = Query.exec("DROP TABLE IF EXISTS 'BaseItem'");
+            CheckResult(Result, Query);
+            Result = Query.exec("DROP TABLE IF EXISTS 'TextItem'");
+            CheckResult(Result, Query);
+            Result = Query.exec("DROP TABLE IF EXISTS 'ImageItem'");
+            CheckResult(Result, Query);
+            Result = Query.exec("DROP TABLE IF EXISTS 'Connection'");
+            CheckResult(Result, Query);
+            Result = Query.exec("DROP TABLE IF EXISTS 'ItemGroup'");
+            CheckResult(Result, Query);
+            Result = Query.exec("DROP TABLE IF EXISTS 'Canvas'");
+            CheckResult(Result, Query);
+
+            // Create Table
+            Result = Query.exec("CREATE TABLE 'BaseItem' ("
+                                "'Identity'              INTEGER,       "
+                                "'Alias'                TEXT,           "
+                                "'CreatedAt'            TEXT,       "
+                                "'LastModifiedAt'       TEXT,   "
+                                "'Position'             TEXT,       "
+                                "'FoldConnectionCount'  INTEGER,"
+                                "'Collapsed'            CHAR(2),"
+                                "'ParentPosWhenCollapse' TEXT,"
+                                "'GroupItemID'          INTEGER,"
+                                "'CanvasID'             INTEGER,"
+                                "PRIMARY KEY('Identity')   "
+                                ")");
+            Result = Query.exec("CREATE TABLE 'TextItem' ("
+                                "'Identity'    INTEGER,       "
+                                "'Content'	TEXT,       "
+                                "PRIMARY KEY('Identity')   "
+                                ")");
+            CheckResult(Result, Query);
+            Result = Query.exec("CREATE TABLE 'ImageItem' ("
+                                "'Identity'   INTEGER,       "
+                                "'Content'	BLOB,       "
+                                "PRIMARY KEY('Identity')   "
+                                ")");
+            CheckResult(Result, Query);
+            Result = Query.exec("CREATE TABLE 'Connection' ("
+                                "'Identity'     INTEGER,"
+                                "'FromID'     INTEGER,        "
+                                "'ToID'       INTEGER,        "
+                                "'Collapsed'  CHAR(2),     "
+                                "'SrcConnected' CHAR(2),     "
+                                "'DstConnected' CHAR(2),     "
+                                "'GroupItemID'  INTEGER,"
+                                "'CanvasID'     INTEGER,"
+                                "PRIMARY KEY('Identity')"
+                                ")");
+            CheckResult(Result, Query);
+            Result = Query.exec("CREATE TABLE 'ItemGroup' ("
+                                "'GroupItemID'  INTEGER,"
+                                "'PosWhenGrouping'  TEXT,"
+                                "'CanvasID'     INTEGER,"
+                                "PRIMARY KEY('GroupItemID')"
+                                ")");
+            CheckResult(Result, Query);
+            Result = Query.exec("CREATE TABLE 'Canvas' ("
+                                "'CanvasID'     INTEGER,"
+                                "'CanvasName'   TEXT,"
+                                "PRIMARY KEY('CanvasID')"
+                                ")");
+            CheckResult(Result, Query);
         }
         void InsertBaseItem(KItemController* Item, QSqlQuery& Query,
                             const QVariant& CanvasID, const QVariant& GroupID = QVariant()){
@@ -47,18 +126,21 @@ namespace Kim {
             bool Result = Query.exec();
             CheckResult(Result, Query);
         }
+
         void InsertTextItem(KTextItemController* TextItem, QSqlQuery& Query){
             Query.bindValue(":Identity", QVariant(TextItem->Identity));
             Query.bindValue(":Content", QVariant(TextItem->GetView()->GetContent()));
             bool Result = Query.exec();
             CheckResult(Result, Query);
         }
+
         void InsertImageItem(KImageItemController* ImageItem, QSqlQuery& Query){
             Query.bindValue(":Identity", QVariant(ImageItem->Identity));
             Query.bindValue(":Content", ImageItem->GetItemView<KImageItemView>()->GetImageAsByteArray());
             bool Result = Query.exec();
             CheckResult(Result, Query);
         }
+
         void InsertConnection(KConnectionController* Conn, QSqlQuery& Query,
                               const QVariant& CanvasID, const QVariant& GroupID = QVariant()){
             Query.bindValue(":Identity", QVariant(Conn->GetIdentity()));
@@ -72,6 +154,7 @@ namespace Kim {
             bool Result = Query.exec();
             CheckResult(Result, Query);
         }
+
         void InsertItems(const QLinkedList<KItemController*>& Items, QSqlQuery& Query,
                          const QVariant& CanvasID, const QVariant& GroupID = QVariant()){
             QString BaseItemPrepare = QString("INSERT INTO BaseItem VALUES (:Identity, :Alias, :CreatedAt,"
@@ -94,6 +177,7 @@ namespace Kim {
                     InsertImageItem(static_cast<KImageItemController*>(Item), Query);
             }
         }
+
         void InsertConnections(const QLinkedList<KConnectionController*>& Conns, QSqlQuery& Query,
                                const QVariant& CanvasID, const QVariant& GroupID = QVariant()){
             QString ConnectionPrepare = QString("INSERT INTO Connection VALUES (:Identity, :FromID, :ToID, :Collapsed, "
@@ -103,6 +187,7 @@ namespace Kim {
                 InsertConnection(Conn, Query, CanvasID, GroupID);
             }
         }
+
         void InsertGroups(const QList<KItemGroupController*>& Groups, QSqlQuery& Query,
                           const QVariant& CanvasID){
             QString GroupPrepare = QString("INSERT INTO ItemGroup VALUES (:GroupItemID, :PosWhenGrouping, :CanvasID");
@@ -115,6 +200,7 @@ namespace Kim {
                 CheckResult(Result, Query);
             }
         }
+
         void InsertCanvases(const QList<KCanvasController*>& Canvases, QSqlQuery& Query){
             QString CanvasPrepare = QString("INSERT INTO Canvas VALUES (:CanvasID, :CanvasName)");
             Query.prepare(CanvasPrepare);
@@ -125,132 +211,10 @@ namespace Kim {
                 CheckResult(Result, Query);
             }
         }
-    public:
-        KDBSerializer(const QString& DatabaseName): DatabaseName(DatabaseName){
-            QSqlDatabase DB = QSqlDatabase::addDatabase("QSQLITE", ConnectionName);
-            DB.setDatabaseName(DatabaseName);
-            DB.open();
 
-        }
-        virtual ~KDBSerializer()override{
-            {
-                QSqlDatabase DB = QSqlDatabase::database(ConnectionName);
-                DB.close();
-            }
-            QSqlDatabase::removeDatabase(ConnectionName);
-        }
-        /**
-         * @brief Serialize
-         * @param CanvasController: the controller to serialize from, should be not null
-         * @param OutputPath: output path
-         */
-        virtual void Serialize(KCanvasController* CanvasController, const QString& OutputPath) override{
-            {
-                QSqlDatabase DB = QSqlDatabase::database(ConnectionName);
-                bool TranscationResult = true;
-                if(UseTransaction){
-                    TranscationResult = DB.transaction();
-                    if(!TranscationResult)
-                        qDebug()<<DB.lastError();
-                }
-
-                bool Result = true;
-                QSqlQuery Query(DB);
-                if(NeedRecreateTable){
-                    // Drop Table
-                    Result = Query.exec("DROP TABLE IF EXISTS 'BaseItem'");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("DROP TABLE IF EXISTS 'TextItem'");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("DROP TABLE IF EXISTS 'ImageItem'");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("DROP TABLE IF EXISTS 'Connection'");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("DROP TABLE IF EXISTS 'ItemGroup'");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("DROP TABLE IF EXISTS 'Canvas'");
-                    CheckResult(Result, Query);
-
-                    // Create Table
-                    Result = Query.exec("CREATE TABLE 'BaseItem' ("
-                                        "'Identity'              INTEGER,       "
-                                        "'Alias'                TEXT,           "
-                                        "'CreatedAt'            TEXT,       "
-                                        "'LastModifiedAt'       TEXT,   "
-                                        "'Position'             TEXT,       "
-                                        "'FoldConnectionCount'  INTEGER,"
-                                        "'Collapsed'            CHAR(2),"
-                                        "'ParentPosWhenCollapse' TEXT,"
-                                        "'GroupItemID'          INTEGER,"
-                                        "'CanvasID'             INTEGER,"
-                                        "PRIMARY KEY('Identity')   "
-                                        ")");
-                    Result = Query.exec("CREATE TABLE 'TextItem' ("
-                                        "'Identity'    INTEGER,       "
-                                        "'Content'	TEXT,       "
-                                        "PRIMARY KEY('Identity')   "
-                                        ")");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("CREATE TABLE 'ImageItem' ("
-                                        "'Identity'   INTEGER,       "
-                                        "'Content'	BLOB,       "
-                                        "PRIMARY KEY('Identity')   "
-                                        ")");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("CREATE TABLE 'Connection' ("
-                                        "'Identity'     INTEGER,"
-                                        "'FromID'     INTEGER,        "
-                                        "'ToID'       INTEGER,        "
-                                        "'Collapsed'  CHAR(2),     "
-                                        "'SrcConnected' CHAR(2),     "
-                                        "'DstConnected' CHAR(2),     "
-                                        "'GroupItemID'  INTEGER,"
-                                        "'CanvasID'     INTEGER,"
-                                        "PRIMARY KEY('Identity')"
-                                        ")");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("CREATE TABLE 'ItemGroup' ("
-                                        "'GroupItemID'  INTEGER,"
-                                        "'PosWhenGrouping'  TEXT,"
-                                        "'CanvasID'     INTEGER,"
-                                        "PRIMARY KEY('GroupItemID')"
-                                        ")");
-                    CheckResult(Result, Query);
-                    Result = Query.exec("CREATE TABLE 'Canvas' ("
-                                        "'CanvasID'     INTEGER,"
-                                        "'CanvasName'   TEXT,"
-                                        "PRIMARY KEY('CanvasID')"
-                                        ")");
-                    CheckResult(Result, Query);
-                }
-                // Insert Data
-                const auto& Items = CanvasController->ItemControlleres;
-                const auto& Conns = CanvasController->ConnectionControlleres;
-                const auto& CanvasID = CanvasController->CanvasID;
-                // insert items
-                InsertItems(Items, Query, CanvasID);
-                // insert connections
-                InsertConnections(Conns, Query, CanvasID);
-                // insert groups
-                const auto& Groups = CanvasController->GroupControlleres.values();
-                for(auto Group : Groups){
-                    InsertItems(Group->GetItems(), Query, CanvasID, Group->GetGroupID());
-                    InsertConnections(Group->GetAllConnections(), Query, CanvasID, Group->GetGroupID());
-                }
-                InsertGroups(Groups, Query, CanvasID);
-                // insert canvases
-                InsertCanvases({CanvasController}, Query);
-                if(UseTransaction && TranscationResult)
-                    if(!DB.commit())
-                        qDebug()<<DB.lastError();
-            }
-            emit FinishedSignal();
-        }
-        /**
-         * @brief Deserialize
-         * @param InputPath: input path
-         * @param CanvasController: the controller to serialize to, should be not null
-         */
+        ////////////////////////////////////////////////////////////////
+        /// Deserialize
+        ////////////////////////////////////////////////////////////////
         struct BaseItemRecord{
             qint64 Identity;
             QString Alias;
@@ -410,6 +374,7 @@ namespace Kim {
                 Result.append(Record);
             }
         }
+
         void SelectCanvases(const QSqlDatabase& DB, QList<CanvasRecord>& Result){
             QSqlQuery Query = QSqlQuery(QString("SELECT * FROM Canvas"), DB);
             Result.clear();
@@ -420,8 +385,90 @@ namespace Kim {
                 Result.append(Record);
             }
         }
+    public:
+        KDBSerializer(const QString& DatabaseName): KSerializer(DatabaseName){
+            QSqlDatabase DB = QSqlDatabase::addDatabase("QSQLITE", ConnectionName);
+            DB.setDatabaseName(DatabaseName);
+            DB.open();
 
-        virtual void Deserialize(const QString& InputPath, KCanvasController* CanvasController, const QVariant& OriCanvasID = QVariant()) override{
+        }
+        virtual ~KDBSerializer()override{
+            {
+                QSqlDatabase DB = QSqlDatabase::database(ConnectionName);
+                DB.close();
+            }
+            QSqlDatabase::removeDatabase(ConnectionName);
+        }
+        /**
+         * @brief Serialize
+         * @param CanvasController: the controller to serialize from, should be not null
+         * @param OutputPath: output path
+         */
+        virtual void Serialize(KCanvasController* CanvasController) override{
+            {
+                QSqlDatabase DB = QSqlDatabase::database(ConnectionName);
+                bool TranscationResult = true;
+                if(UseTransaction){
+                    TranscationResult = DB.transaction();
+                    if(!TranscationResult)
+                        qDebug()<<DB.lastError();
+                }
+
+                QSqlQuery Query(DB);
+                if(NeedRecreateTable){
+                    RecreateTable(Query);
+                }
+                // Insert Data
+                const auto& Items = CanvasController->ItemControlleres;
+                const auto& Conns = CanvasController->ConnectionControlleres;
+                const auto& CanvasID = CanvasController->CanvasID;
+                // insert items
+                InsertItems(Items, Query, CanvasID);
+                // insert connections
+                InsertConnections(Conns, Query, CanvasID);
+                // insert groups
+                const auto& Groups = CanvasController->GroupControlleres.values();
+                for(auto Group : Groups){
+                    InsertItems(Group->GetItems(), Query, CanvasID, Group->GetGroupID());
+                    InsertConnections(Group->GetAllConnections(), Query, CanvasID, Group->GetGroupID());
+                }
+                InsertGroups(Groups, Query, CanvasID);
+                // insert canvases
+                InsertCanvases({CanvasController}, Query);
+                if(UseTransaction && TranscationResult)
+                    if(!DB.commit())
+                        qDebug()<<DB.lastError();
+            }
+            if(EmitFinishedSignal)
+                emit FinishedSignal();
+        }
+        virtual void Serialize(KMainViewController* MainController) override{
+            {
+                auto DB = QSqlDatabase::database(ConnectionName);
+                QSqlQuery Query(DB);
+                DB.transaction();
+                RecreateTable(Query);
+
+                this->UseTransaction = false;
+                this->NeedRecreateTable = false;
+                this->EmitFinishedSignal = false;
+
+                const auto& Canvases = MainController->GetCanvasControlleres();
+                for(auto Canvas : Canvases){
+                    this->Serialize(Canvas);
+                }
+
+                DB.commit();
+                emit FinishedSignal();
+            }
+        }
+        /**
+         * @brief Deserialize
+         * @param InputPath: input path
+         * @param CanvasController: the controller to serialize to, should be not null
+         */
+        virtual void Deserialize(KCanvasController* CanvasController, const QVariant& OriCanvasID = QVariant()) override{
+            CanvasController->Clear();
             {
                 QSqlDatabase DB = QSqlDatabase::database(ConnectionName);
                 QList<TextItemRecord>TextItems;
@@ -429,11 +476,14 @@ namespace Kim {
                 QList<ConnectionRecord>Connections;
                 QList<ItemGroupRecord>Groups;
                 QVariant CanvasID = OriCanvasID;
+                // 如果没有canvas id，那么就是加载canvas
+                // 而不是在open project
                 if(CanvasID.isNull()){
                     QList<CanvasRecord> Canvases;
                     SelectCanvases(DB, Canvases);
                     if(Canvases.isEmpty())return;
                     CanvasID = Canvases.front().CanvasID;
+                    CanvasController->SetCanvasID(CanvasID.toLongLong());
                 }
                 // not grouped
                 SelectTextItems(DB, TextItems, CanvasID);
@@ -498,6 +548,22 @@ namespace Kim {
                                     GroupController, &KItemGroupController::OnOutConnectionDestroyed);
                         }
                     }
+                }
+            }
+        }
+        virtual void Deserialize(KMainViewController* MainController) override{
+            MainController->Clear();
+            {
+                auto DB = QSqlDatabase::database(ConnectionName);
+                QList<CanvasRecord> Canvases;
+                SelectCanvases(DB, Canvases);
+                for(const auto& Canvas : Canvases){
+                    auto CanvasWrapper = MainController->CreateCanvasWrapper();
+                    auto CanvasController = CanvasWrapper->GetCanvasController();
+                    this->Deserialize(CanvasController, Canvas.CanvasID);
+                    CanvasController->SetCanvasID(Canvas.CanvasID);
+                    CanvasController->SetCanvasName(Canvas.CanvasName);
+                    MainController->AddCanvasWrapper(CanvasWrapper);
                 }
             }
         }
