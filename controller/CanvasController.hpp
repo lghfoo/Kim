@@ -259,6 +259,49 @@ namespace Kim {
             }
         }
 
+        // 在所有选中的连接中插入一个item
+        void OnInsertItem(int ItemType){
+            QList<KConnectionController*>SelectedConns{};
+            KItemController* SrcItem = nullptr;
+            QPointF NewItemPos(0, 0);
+            for(auto Controller : SelectedControlleres){
+                if(Controller->type() == KConnectionView::Type){
+                    SelectedConns.append(static_cast<KConnectionController*>(Controller));
+                    auto Conn = SelectedConns.back();
+                    auto SrcPos = Conn->GetSrcItemController()->GetPos();
+                    auto DstPos = Conn->GetDstItemController()->GetPos();
+                    NewItemPos += (SrcPos + DstPos) / 2.0;
+                }
+            }
+            if(SelectedConns.isEmpty())return;
+            NewItemPos /= SelectedConns.size();
+            KItemController* NewItem = CreateItemController(ItemType);
+            NewItem->SetPos(NewItemPos);
+            AddItemContrller(NewItem);
+            QMultiMap <KItemController*, KItemController*> LeftMap{}, RightMap{};
+            while(!SelectedConns.isEmpty()){
+                auto Conn = SelectedConns.back();
+                SelectedConns.pop_back();
+                if(!LeftMap.contains(Conn->GetSrcItemController(), NewItem)){
+                    auto NewConnLeft = CreateConnectionController();
+                    NewConnLeft->SetSrcItemController(Conn->GetSrcItemController());
+                    NewConnLeft->SetDstItemController(NewItem);
+                    AddConnectionController(NewConnLeft);
+                    LeftMap.insert(Conn->GetSrcItemController(), NewItem);
+                }
+                if(!RightMap.contains(NewItem, Conn->GetDstItemController())){
+                    auto NewConnRight = CreateConnectionController();
+                    NewConnRight->SetSrcItemController(NewItem);
+                    NewConnRight->SetDstItemController(Conn->GetDstItemController());
+                    RightMap.insert(NewItem, Conn->GetDstItemController());
+                    AddConnectionController(NewConnRight);
+                }
+                // TODO:利用旧边
+                DeleteConnection(Conn);
+            }
+        }
+
+
         // when delete item, always delete connection first.
         // except for group item
         void OnItemDelete(KItemController* Controller){

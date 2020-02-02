@@ -183,9 +183,10 @@ namespace Kim {
                             emit SelectedAllChildrenSignal(SelectionType::All);
                         }
                         Event->setAccepted(true);
-                        return true;
                     }
+                    return true;
                 }
+                break;
             }
             default:
                 break;

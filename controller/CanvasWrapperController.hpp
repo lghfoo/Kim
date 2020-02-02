@@ -78,6 +78,16 @@ namespace Kim {
                     [=]{
                 this->CanvasController->OnGroupToItem(KImageItemView::Type);
             });
+            connect(View,
+                    &KCanvasWrapperView::InsertTextItemSignal,
+                    [=]{
+               this->CanvasController->OnInsertItem(KTextItemView::Type);
+            });
+            connect(View,
+                    &KCanvasWrapperView::InsertImageItemSignal,
+                    [=]{
+                this->CanvasController->OnInsertItem(KImageItemView::Type);
+            });
         }
         ~KCanvasWrapperController(){
             delete View;

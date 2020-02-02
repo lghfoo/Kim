@@ -139,7 +139,7 @@ namespace Kim {
         virtual void mousePressEvent(QGraphicsSceneMouseEvent* Event) override{
             if(!itemAt(Event->scenePos(), QTransform())){
                 Cursor->setPos(Event->scenePos());
-                Cursor->update();
+//                Cursor->update();
             }
             QGraphicsScene::mousePressEvent(Event);
         }

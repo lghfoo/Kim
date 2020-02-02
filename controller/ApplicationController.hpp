@@ -40,6 +40,7 @@ namespace Kim {
                     &KSerializer::FinishedSignal,
                     []{
                 QMessageBox msgBox;
+                msgBox.setWindowFlag(Qt::WindowStaysOnTopHint);
                 msgBox.setText("Saved.");
                 msgBox.exec();
             });
@@ -73,6 +74,7 @@ namespace Kim {
                     &KSerializer::FinishedSignal,
                     []{
                 QMessageBox msgBox;
+                msgBox.setWindowFlag(Qt::WindowStaysOnTopHint);
                 msgBox.setText("Saved.");
                 msgBox.exec();
             });
