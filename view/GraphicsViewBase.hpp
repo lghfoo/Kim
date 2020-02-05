@@ -1,10 +1,13 @@
-#pragma once
+﻿#pragma once
 #include<QGraphicsObject>
 namespace Kim {
+    class KGraphicsObjectController;
     class KGraphicsViewBase : public QGraphicsObject{
         Q_OBJECT
     signals:
         void SelectedChangedSignal(bool Selected);
+    private:
+        KGraphicsObjectController* Controller = nullptr;
     public:
         virtual KGraphicsViewBase* Clone(){return nullptr;}
         KGraphicsViewBase(){
@@ -19,6 +22,12 @@ namespace Kim {
                 emit SelectedChangedSignal(this->isSelected());
             }
             return QGraphicsObject::itemChange(change, value);
+        }
+        KGraphicsObjectController* GetController(){
+            return Controller;
+        }
+        void SetController(KGraphicsObjectController* Controller){
+            this->Controller = Controller;
         }
     };
 

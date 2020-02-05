@@ -414,6 +414,65 @@ namespace Kim {
             static_cast<KTextItemView*>(GraphicsObject)->AppendText(Text);
         }
     };
+
+    class KTextItemPropertyController {
+    private:
+        KTextItemController* Item = nullptr;
+        KTextItemPropertyView* PropertyView = new KTextItemPropertyView;
+    public:
+        KTextItemPropertyController(){
+            QObject::connect(PropertyView, &KTextItemPropertyView::FontChangedSignal,[=](const QFont& Font){
+                if(this->Item){
+                    Item->GetItemView<KTextItemView>()->prepareGeometryChange();
+                    Item->GetItemView<KTextItemView>()->Style.Font = Font;
+                    Item->GetItemView<KTextItemView>()->update();
+                }
+            });
+            QObject::connect(PropertyView, &KTextItemPropertyView::AliasChangedSignal,[=](const QString& Alias){
+                if(this->Item){
+                    Item->SetAlias(Alias);
+                    Item->GetItemView<KTextItemView>()->update();
+                }
+            });
+            QObject::connect(PropertyView, &KTextItemPropertyView::BorderColorChangedSignal,[=](const QColor& Color){
+                if(this->Item){
+                    Item->GetItemView<KTextItemView>()->Style.BorderColor = Color;
+                    Item->GetItemView<KTextItemView>()->update();
+                }
+            });
+            QObject::connect(PropertyView, &KTextItemPropertyView::FontColorChangedSignal,[=](const QColor& Color){
+                if(this->Item){
+                    Item->GetItemView<KTextItemView>()->Style.TextColor = Color;
+                    Item->GetItemView<KTextItemView>()->update();
+                }
+            });
+            QObject::connect(PropertyView, &KTextItemPropertyView::BackgroundColorChangedSignal,[=](const QColor& Color){
+                if(this->Item){
+                    Item->GetItemView<KTextItemView>()->Style.BackgroundColor = Color;
+                    Item->GetItemView<KTextItemView>()->update();
+                }
+            });
+        }
+        void SetItem(KTextItemController* Item){
+            if(this->Item){
+                // disconnect
+            }
+            this->Item = Item;
+            if(Item){
+                auto View = Item->GetItemView<KTextItemView>();
+                const auto& Style = View->Style;
+                PropertyView->FontPicker->SetFont(Style.Font);
+                PropertyView->ItemAliasEdit->setText(Item->GetAlias());
+                PropertyView->FontColorPicker->SetColor(Style.TextColor);
+                PropertyView->BackgroundColorPicker->SetColor(Style.BackgroundColor);
+                PropertyView->BorderColorPicker->SetColor(Style.BorderColor);
+            }
+        }
+        KTextItemPropertyView* GetView(){
+            return PropertyView;
+        }
+    };
+
     //////////////////////////////// Image Item ////////////////////////////////
     class KImageItemController : public KItemController{
     public:

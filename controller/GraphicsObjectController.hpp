@@ -11,12 +11,14 @@ namespace Kim {
         QGraphicsObject* GraphicsObject = nullptr;
     public:
         KGraphicsObjectController(QGraphicsObject* Object):GraphicsObject(Object){
-            connect(static_cast<KGraphicsViewBase*>(Object),
+            auto View = static_cast<KGraphicsViewBase*>(Object);
+            connect(View,
                     &KGraphicsViewBase::SelectedChangedSignal,
                     this,
                     [=](bool Selected){
                 emit SelectedChangedSignal(this, Selected);
             });
+            View->SetController(this);
         }
 
         void RequestFocus(Qt::FocusReason Reason = Qt::NoFocusReason){

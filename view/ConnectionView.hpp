@@ -4,6 +4,7 @@
 #include<QGraphicsSceneDragDropEvent>
 #include <QKeyEvent>
 #include<QDebug>
+#include <QLinkedList>
 #include"GraphicsViewBase.hpp"
 #include"../common/Utility.hpp"
 namespace Kim {
@@ -71,11 +72,75 @@ namespace Kim {
         }
     };
     //////////////////////////////// Connection ////////////////////////////////
+    class KControlPoint : public QGraphicsObject{
+        Q_OBJECT
+    public:
+        enum {Type = ViewType::ControlPointType};
+    signals:
+        void PosChangedSignal();
+        void DeletedSignal(KControlPoint*);
+    private:
+        qreal Radius = 3.0;
+    public:
+        virtual int type()const override{
+            return Type;
+        }
+        KControlPoint(){
+            this->setFlag(QGraphicsItem::ItemSendsGeometryChanges);
+            this->setFlag(QGraphicsItem::ItemIsMovable);
+            this->setFlag(QGraphicsItem::ItemIsSelectable);
+//            this->setBrush(Qt::black);
+//            qreal Radius = 3;
+//            this->setRect({-Radius, -Radius, Radius * 2, Radius * 2});
+        }
+        virtual QVariant itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant &value)override{
+            if(change == QGraphicsItem::GraphicsItemChange::ItemPositionHasChanged){
+                emit PosChangedSignal();
+            }
+            else if(change == QGraphicsItem::GraphicsItemChange::ItemSelectedHasChanged){
+                if(this->isSelected()){
+                    this->setFocus();
+                }
+            }
+            return QGraphicsObject::itemChange(change, value);
+        }
+        virtual void paint(QPainter* Painter, const QStyleOptionGraphicsItem* Option, QWidget* Parent = nullptr)override{
+            QPainterPath Path;
+            QRectF Rect = {-Radius, -Radius, Radius * 2, Radius * 2};
+            if(this->isSelected()){
+                Rect = PaddingOut(Rect, 3);
+            }
+            Path.addEllipse(Rect);
+            Painter->fillPath(Path, Qt::black);
+        }
+
+        virtual QRectF boundingRect()const override{
+            return PaddingOut({-Radius, -Radius, Radius * 2, Radius * 2}, 5);
+        }
+
+        void SetRadius(qreal Radius){
+            this->prepareGeometryChange();
+            this->Radius = Radius;
+            this->update();
+        }
+
+//        virtual void keyPressEvent(QKeyEvent* Event) override {
+//            qDebug()<<"key press"<<Event->key();
+//            if(Event->key() == Qt::Key_Delete){
+//                emit DeletedSignal(this);
+//            }
+//        }
+//        virtual bool sceneEvent(QEvent* Event)override{
+//            qDebug()<<Event;
+//            return QGraphicsObject::sceneEvent(Event);
+//        }
+    };
+
     class KConnectionView : public KGraphicsViewBase{
         Q_OBJECT
     public:
         enum KShapeType{Line, Quad, Cubic};
-        enum {Type = UserType + 1};
+        enum {Type = ViewType::ConnectionType};
         struct KArrowInfo{
             QPointF EndianPoint = QPointF(0, 0);
             QPointF FromPoint = QPointF(0, 0);
@@ -96,6 +161,11 @@ namespace Kim {
         bool SelectedOnly = false;
         KDecoration* FromDecoration = new KArrowDecoration;
         KDecoration* ToDecoration = new KArrowDecoration;
+        QLinkedList<KControlPoint*>Ctrls={};
+        QGraphicsItem* FromItem = nullptr;
+        QGraphicsItem* ToItem = nullptr;
+        qreal FromT = 1;
+        qreal ToT = 1;
     public slots:
         void UpdateFrom(const QPointF& From){
             this->prepareGeometryChange();
@@ -105,6 +175,12 @@ namespace Kim {
         void UpdateTo(const QPointF& To){
             this->prepareGeometryChange();
             this->To = To;
+            this->update();
+        }
+        void DeleteControlPoint(KControlPoint* Control){
+            this->prepareGeometryChange();
+            Ctrls.removeOne(Control);
+            delete Control;
             this->update();
         }
     protected:
@@ -160,6 +236,22 @@ namespace Kim {
                 }
             }
             return KGraphicsViewBase::itemChange(change, value);
+        }
+
+        void SetFromItem(QGraphicsItem* FromItem){
+            this->FromItem = FromItem;
+        }
+
+        void SetToItem(QGraphicsItem* ToItem){
+            this->ToItem = ToItem;
+        }
+
+        QGraphicsItem* GetFromItem(){
+            return this->FromItem;
+        }
+
+        QGraphicsItem* GetToItem(){
+            return this->ToItem;
         }
 
         virtual KGraphicsViewBase* Clone() override{
@@ -239,28 +331,48 @@ namespace Kim {
         }
 
         virtual QRectF boundingRect() const override{
-            qreal Padding = 2.0;
-            qreal X = std::min(From.x(), To.x()) - Padding/2.0;
-            qreal Y = std::min(From.y(), To.y()) - Padding/2.0;
-            qreal W = std::abs(To.x() - From.x()) + Padding;
-            qreal H = std::abs(To.y() - From.y()) + Padding;
-            return QRectF(X, Y, W, H);
+
+//            qreal Padding = 2.0;
+//            qreal X = std::min(From.x(), To.x());
+//            qreal Y = std::min(From.y(), To.y());
+//            qreal W = std::abs(To.x() - From.x());
+//            qreal H = std::abs(To.y() - From.y());
+//            auto Rect = QRectF(X, Y, W, H);
+//            for(auto Item: Ctrls){
+//                Extend(Rect, Item->pos());
+//            }
+//            return Rect;
+            const qreal DecorPadding = 20;
+            QRectF Rect{0,0,0,0};
+            const auto& Lines = CreateLines();
+            for(const auto& Line : Lines){
+                ExtendRect(Rect, Line);
+            }
+            return PaddingOut(Rect, 3.0 + DecorPadding);
         }
 
         QPainterPath GetShape()const{
             QPainterPath Path;
-            Path.moveTo(From);
-            switch (ShapeType) {
-            case KShapeType::Line:
-                Path.lineTo(To);
-                break;
-            case KShapeType::Quad:
-                Path.quadTo(CtrlFrom, To);
-                break;
-            case KShapeType::Cubic:
-                Path.cubicTo(CtrlFrom, CtrlTo, To);
-                break;
-            }
+            const auto& Points = CreatePoints();
+            Path.addPolygon({Points});
+            return Path;
+//            Path.moveTo(From);
+//            const auto& Lines = CreateLines();
+//            for(const auto& Line : Lines){
+//                Path.moveTo(Line.p1());
+//                Path.lineTo(Line.p2());
+//            }
+//            switch (ShapeType) {
+//            case KShapeType::Line:
+//                Path.lineTo(To);
+//                break;
+//            case KShapeType::Quad:
+//                Path.quadTo(CtrlFrom, To);
+//                break;
+//            case KShapeType::Cubic:
+//                Path.cubicTo(CtrlFrom, CtrlTo, To);
+//                break;
+//            }
             return Path;
         }
 
@@ -283,16 +395,422 @@ namespace Kim {
                 Pen.setColor(Qt::lightGray);
                 Brush.setColor(Qt::lightGray);
             }
+            Pen.setJoinStyle(Qt::PenJoinStyle::RoundJoin);
             painter->setPen(Pen);
-            painter->drawPath(GetShape());
+//            const auto& Lines = CreateLines();
+//            painter->drawLines(Lines);
+            auto Points = CreatePoints();
+//            for(const auto& Line : Lines){
+//                painter->drawLine(Line);
+//            }
+//            painter->drawPath(GetShape());
 
-            if(ShowToDecoration && ToDecoration->IsValid){
-                ToDecoration->Paint(painter, Brush);
+
+//            if(FromItem){
+//                const auto Rect = FromItem->boundingRect();
+//                auto StartPoint = Points.front();
+//                if(!Rect.contains(StartPoint)){
+
+//                }
+//                else{
+//                    for(int i = 0; i < Points.size(); ++i){
+
+//                    }
+
+//                }
+//            }
+            if(ToItem){
+                const auto Bounding = PaddingOut(ToItem->mapToScene(ToItem->boundingRect()).boundingRect(), 2);
+                auto EndPoint = Points.back();
+                if(Bounding.contains(EndPoint)){
+                    QLineF Lines[4] = {
+                        QLineF(Bounding.topLeft(), Bounding.topRight()),
+                        QLineF(Bounding.bottomLeft(), Bounding.bottomRight()),
+                        QLineF(Bounding.topLeft(), Bounding.bottomLeft()),
+                        QLineF(Bounding.topRight(), Bounding.bottomRight())
+                    };
+                    while (Points.size() >= 2) {
+                        const auto& P0 = Points[Points.size() - 1];
+                        const auto& P1 = Points[Points.size() - 2];
+                        Points.pop_back();
+                        QLineF L{P0, P1};
+                        QPointF Result;
+                        bool ShouldBreak = false;
+                        for(const auto& Line : Lines){
+                            auto IntersectType = Line.intersect(L, &Result);
+                            if(IntersectType == QLineF::IntersectType::BoundedIntersection){
+                                Points.push_back(Result);
+                                ShouldBreak = true;
+                                break;
+                            }
+                        }
+                        if(ShouldBreak){
+                            break;
+                        }
+                    }
+
+                }
+                if(Points.size() >=2 && ShowToDecoration && ToDecoration){
+                    EndPoint = Points.back();
+                    QPointF EndDir = Points[Points.size() - 2] - Points.back();
+                    if(ToDecoration->type() == KArrowDecoration::Type){
+                        if(KNormalize(EndDir)){
+                            auto ArrowDecor = static_cast<KArrowDecoration*>(ToDecoration);
+                            auto HSize = ArrowDecor->HSize;
+                            ArrowDecor->FromPoint = EndPoint + EndDir * HSize;
+                            ArrowDecor->EndianPoint = EndPoint;
+                            Points.back() = (ArrowDecor->FromPoint + ArrowDecor->EndianPoint)/2;
+                            ToDecoration->Paint(painter);
+                        }
+                    }
+                }
+
             }
-            if(ShowFromDecoration && FromDecoration->IsValid){
-                FromDecoration->Paint(painter, Brush);
+
+            painter->drawPolyline(&Points[0], Points.size());
+
+//            if(ShowToDecoration && ToDecoration->IsValid){
+
+//                ToDecoration->Paint(painter, Brush);
+//            }
+
+//            if(ShowFromDecoration && FromDecoration->IsValid){
+//                FromDecoration->Paint(painter, Brush);
+//            }
+
+        }
+
+
+        virtual void mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)override{
+            auto ScenePos = event->scenePos();
+            if(Ctrls.isEmpty()){
+                if(InRange(ScenePos.x(), From.x(), To.x())
+                        && InRange(ScenePos.y(), From.y(), To.y())){
+                    ToClosestPoint(ScenePos, From, To);
+                    Ctrls.append(CreateCtrlItem(ScenePos));
+                }
+            }
+            else {
+                QVector<QPointF> Points{From};
+                for(auto Item : Ctrls){
+                    Points.append(Item->pos());
+                }
+                Points.append(To);
+                QVector<QLineF> Lines{};
+                qreal Threshold = 3;
+                for(int i = 0; i < Points.size() - 1; i++){
+                    bool ShouldBreak = false;
+                    Lines.clear();
+                    CreateLines(Lines, i, Points);
+//                qreal Scale = 0.5;
+//                    if(i == 0){
+//                        auto P0 = Points[0];
+//                        auto P1 = Points[1];
+//                        auto P2 = Points[2];
+//                        auto PrevMid = (P0+P1)/2;
+//                        auto NextMid = (P1+P2)/2;
+//                        auto DMid = NextMid - PrevMid;
+//                        auto F = P0;
+//                        auto C = P1 - DMid * Scale;
+//                        auto T = P1;
+//                        CreateQuadLines(Lines, F, C, T);
+//                    }
+//                    else if(i == Points.size() -2){
+//                        auto P0 = Points[i-1];
+//                        auto P1 = Points[i];
+//                        auto P2 = Points[i+1];
+//                        auto PrevMid = (P0+P1)/2;
+//                        auto NextMid = (P1+P2)/2;
+//                        auto DMid = NextMid - PrevMid;
+//                        auto F = P1;
+//                        auto C = P1 + DMid * Scale;
+//                        auto T = P2;
+//                        CreateQuadLines(Lines, F, C, T);
+//                    }
+//                    else{
+//                        auto P0 = Points[i-1];
+//                        auto P1 = Points[i];
+//                        auto P2 = Points[i+1];
+//                        auto P3 = Points[i+2];
+//                        auto Mid0 = (P0+P1)/2;
+//                        auto Mid1 = (P1+P2)/2;
+//                        auto Mid2 = (P2+P3)/2;
+//                        auto DMid1 = Mid1 - Mid0;
+//                        auto DMid2 = Mid2 - Mid1;
+//                        auto C1 = P1 + DMid1 * Scale;
+//                        auto C2 = P2 - DMid2 * Scale;
+//                        CreateCubicLines(Lines, P1, C1, C2, P2);
+//                    }
+
+                    bool IsInBound = false;
+
+                    for(const auto& Line : Lines){
+                        auto Dis = PointDistanceToLine(ScenePos, Line, IsInBound);
+                        if(IsInBound){
+                            if(Dis < Threshold){
+                                auto NewCtrl = CreateCtrlItem(ScenePos);
+                                ShouldBreak = true;
+                                auto Iter = Ctrls.begin();
+                                while(i--){
+                                    ++Iter;
+                                }
+                                Ctrls.insert(Iter, NewCtrl);
+                                break;
+                            }
+                        }
+                    }
+                    if(ShouldBreak)break;
+                }
+            }
+        }
+        KControlPoint* CreateCtrlItem(const QPointF& Pos){
+            auto ControlP = new KControlPoint;
+            connect(ControlP, &KControlPoint::PosChangedSignal,
+                    [=]{
+                this->prepareGeometryChange();
+                this->update();
+            });
+            connect(ControlP, &KControlPoint::DeletedSignal,
+                    this, &KConnectionView::DeleteControlPoint);
+            ControlP->setParentItem(this);
+            ControlP->setPos(Pos);
+            return ControlP;
+        }
+
+//        QVector<QPointF> CreateDMids()const{
+//            QVector<QPointF>DMids{};
+//            auto Iter = Ctrls.begin();
+//            while(Iter != Ctrls.end()){
+//                QPointF PrevP, NextP, CurrP;
+//                CurrP = (*Iter)->pos();
+//                if(Iter == Ctrls.begin()){
+//                    PrevP = From;
+//                    if(Iter + 1 == Ctrls.end()){
+//                        NextP = To;
+//                    }
+//                    else{
+//                        NextP = (*(Iter+1))->pos();
+//                    }
+//                }
+//                else if(Iter + 1 == Ctrls.end()){
+//                    if(Iter == Ctrls.begin()){
+//                        PrevP = From;
+//                    }
+//                    else{
+//                        PrevP = (*(Iter-1))->pos();
+//                    }
+//                    NextP = To;
+//                }
+//                else{
+//                    PrevP = (*(Iter-1))->pos();
+//                    NextP = (*(Iter+1))->pos();
+//                }
+//                auto PrevMid = (PrevP + CurrP) / 2;
+//                auto NextMid = (NextP + CurrP) / 2;
+//                auto DMid = NextMid - PrevMid;
+//                DMids.append(DMid);
+//            }
+//            return DMids;
+//        }
+
+        void CreateLines(QVector<QLineF>& Lines, int i, const QVector<QPointF>& Points)const{
+            qreal Scale = 0.5;
+            if(i == 0){
+                auto P0 = Points[0];
+                auto P1 = Points[1];
+                auto P2 = Points[2];
+
+                auto V0 = P0 - P1;
+                auto V1 = P2 - P1;
+
+                auto Center = KToNormalized(V0) + KToNormalized(V1);
+                QPointF Tangent{-Center.y(), Center.x()};
+                auto V0Proj = Projection(V0, Tangent) * Scale;
+                const auto& F = P0;
+                const auto& C = P1 + V0Proj;
+                const auto& T = P1;
+
+//                auto PrevMid = (P0+P1)/2;
+//                auto NextMid = (P1+P2)/2;
+//                auto DMid = NextMid - PrevMid;
+//                auto F = P0;
+//                auto C = P1 - DMid * Scale;
+//                auto T = P1;
+
+                CreateQuadLines(Lines, F, C, T);
+            }
+            else if(i == Points.size() -2){
+                auto P0 = Points[i-1];
+                auto P1 = Points[i];
+                auto P2 = Points[i+1];
+
+                auto V0 = P0 - P1;
+                auto V1 = P2 - P1;
+                auto Center = KToNormalized(V0) + KToNormalized(V1);
+                QPointF Tangent{-Center.y(), Center.x()};
+                auto V1Proj = Projection(V1, Tangent) * Scale;
+                const auto& F = P1;
+                const auto& C = P1 + V1Proj;
+                const auto& T = P2;
+
+//                auto PrevMid = (P0+P1)/2;
+//                auto NextMid = (P1+P2)/2;
+//                auto DMid = NextMid - PrevMid;
+//                auto F = P1;
+//                auto C = P1 + DMid * Scale;
+//                auto T = P2;
+
+                CreateQuadLines(Lines, F, C, T);
+            }
+            else{
+                auto P0 = Points[i-1];
+                auto P1 = Points[i];
+                auto P2 = Points[i+1];
+                auto P3 = Points[i+2];
+
+                auto V0 = P0 - P1;
+                auto V1 = P2 - P1;
+                auto V2 = P1 - P2;
+                auto V3 = P3 - P2;
+                auto Center1 = KToNormalized(V0) + KToNormalized(V1);
+                auto Center2 = KToNormalized(V2) + KToNormalized(V3);
+                QPointF Tangent1{-Center1.y(), Center1.x()};
+                QPointF Tangent2{-Center2.y(), Center2.x()};
+                auto V1Proj = Projection(V1, Tangent1) * Scale;
+                auto V2Proj = Projection(V2, Tangent2) * Scale;
+                const auto& F = P1;
+                const auto& C1 = P1 + V1Proj;
+                const auto& C2 = P2 + V2Proj;
+                const auto& T = P2;
+
+//                auto Mid0 = (P0+P1)/2;
+//                auto Mid1 = (P1+P2)/2;
+//                auto Mid2 = (P2+P3)/2;
+//                auto DMid1 = Mid1 - Mid0;
+//                auto DMid2 = Mid2 - Mid1;
+//                auto C1 = P1 + DMid1 * Scale;
+//                auto C2 = P2 - DMid2 * Scale;
+
+                CreateCubicLines(Lines, F, C1, C2, T);
             }
         }
 
+        void CreatePoints(QVector<QPointF>& OutputPoints, int i, const QVector<QPointF>& Points)const{
+            qreal Scale = 0.5;
+            if(i == 0){
+                auto P0 = Points[0];
+                auto P1 = Points[1];
+                auto P2 = Points[2];
+
+                auto V0 = P0 - P1;
+                auto V1 = P2 - P1;
+
+                auto Center = KToNormalized(V0) + KToNormalized(V1);
+                QPointF Tangent{-Center.y(), Center.x()};
+                auto V0Proj = Projection(V0, Tangent) * Scale;
+                const auto& F = P0;
+                const auto& C = P1 + V0Proj;
+                const auto& T = P1;
+
+//                auto PrevMid = (P0+P1)/2;
+//                auto NextMid = (P1+P2)/2;
+//                auto DMid = NextMid - PrevMid;
+//                auto F = P0;
+//                auto C = P1 - DMid * Scale;
+//                auto T = P1;
+
+                CreateQuadPoints(OutputPoints, F, C, T);
+            }
+            else if(i == Points.size() -2){
+                auto P0 = Points[i-1];
+                auto P1 = Points[i];
+                auto P2 = Points[i+1];
+
+                auto V0 = P0 - P1;
+                auto V1 = P2 - P1;
+                auto Center = KToNormalized(V0) + KToNormalized(V1);
+                QPointF Tangent{-Center.y(), Center.x()};
+                auto V1Proj = Projection(V1, Tangent) * Scale;
+                const auto& F = P1;
+                const auto& C = P1 + V1Proj;
+                const auto& T = P2;
+
+//                auto PrevMid = (P0+P1)/2;
+//                auto NextMid = (P1+P2)/2;
+//                auto DMid = NextMid - PrevMid;
+//                auto F = P1;
+//                auto C = P1 + DMid * Scale;
+//                auto T = P2;
+
+                CreateQuadPoints(OutputPoints, F, C, T);
+            }
+            else{
+                auto P0 = Points[i-1];
+                auto P1 = Points[i];
+                auto P2 = Points[i+1];
+                auto P3 = Points[i+2];
+
+                auto V0 = P0 - P1;
+                auto V1 = P2 - P1;
+                auto V2 = P1 - P2;
+                auto V3 = P3 - P2;
+                auto Center1 = KToNormalized(V0) + KToNormalized(V1);
+                auto Center2 = KToNormalized(V2) + KToNormalized(V3);
+                QPointF Tangent1{-Center1.y(), Center1.x()};
+                QPointF Tangent2{-Center2.y(), Center2.x()};
+                auto V1Proj = Projection(V1, Tangent1) * Scale;
+                auto V2Proj = Projection(V2, Tangent2) * Scale;
+                const auto& F = P1;
+                const auto& C1 = P1 + V1Proj;
+                const auto& C2 = P2 + V2Proj;
+                const auto& T = P2;
+
+//                auto Mid0 = (P0+P1)/2;
+//                auto Mid1 = (P1+P2)/2;
+//                auto Mid2 = (P2+P3)/2;
+//                auto DMid1 = Mid1 - Mid0;
+//                auto DMid2 = Mid2 - Mid1;
+//                auto C1 = P1 + DMid1 * Scale;
+//                auto C2 = P2 - DMid2 * Scale;
+
+                CreateCubicPoints(OutputPoints, F, C1, C2, T);
+            }
+        }
+
+        QVector<QLineF> CreateLines()const{
+            QVector<QLineF> Lines{};
+            if(Ctrls.isEmpty()){
+                Lines.append({From, To});
+            }
+            else{
+                QVector<QPointF> Points{From};
+                for(auto Item : Ctrls){
+                    Points.append(Item->pos());
+                }
+                Points.append(To);
+                for(int i = 0; i < Points.size() - 1; i++){
+                    CreateLines(Lines, i, Points);
+                }
+            }
+            return Lines;
+        }
+
+        QVector<QPointF> CreatePoints()const{
+            QVector<QPointF> OutputPoints{};
+            if(Ctrls.isEmpty()){
+                OutputPoints.append({From, To});
+            }
+            else{
+                QVector<QPointF> Points{From};
+                for(auto Item : Ctrls){
+                    Points.append(Item->pos());
+                }
+                Points.append(To);
+                for(int i = 0; i < Points.size() - 1; i++){
+                    CreatePoints(OutputPoints, i, Points);
+                }
+            }
+            return OutputPoints;
+        }
     };
 }

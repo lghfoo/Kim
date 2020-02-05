@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include<QPointF>
 #include<QtMath>
 namespace Kim {
@@ -18,5 +18,11 @@ namespace Kim {
             return true;
         }
         return false;
+    }
+
+    static QPointF KToNormalized(const QPointF& Point){
+        QPointF Ret = Point;
+        KNormalize(Ret);
+        return Ret;
     }
 }

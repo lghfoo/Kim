@@ -20,6 +20,9 @@
 #include <QBuffer>
 #include<QApplication>
 #include <QClipboard>
+#include <QLabel>
+#include <QLineEdit>
+#include <QComboBox>
 #include"../common/Utility.hpp"
 #include"GraphicsViewBase.hpp"
 namespace Kim {
@@ -262,23 +265,62 @@ namespace Kim {
             TextEdit->setText(Text);
         }
     };
+    class KTextItemPropertyController;
+    class KTextItemPropertyView;
     class KTextItemView: public KItemView {
         Q_OBJECT
+        friend class KTextItemPropertyView;
+        friend class KTextItemPropertyController;
     public:
-        enum {Type = UserType + 2};
+        enum {Type = ViewType::TextItemType};
+        enum StylePreset{Green, Orange, Red, Yellow, Black, Blue, Steel, PresetCount};
+        struct KStyle{
+            QFont Font = QFont("Times", 10);
+            QColor BorderColor = Qt::black;
+            QColor TextColor = Qt::black;
+            QColor BackgroundColor = Qt::white;
+        };
     private:
         qreal Padding = 16.0;
         QString Text = "";
         QString PromptText = "Please Enter Text....";
-        QFont Font = QFont("Times", 10);
+        KStyle Style;
+//        Qt::Alignment TextAlignment = Qt::AlignCenter;
     signals:
         void EditSignal();
-    public:        
+    public:
+        static QMap<int, KStyle>& GetStylePresets(){
+            static QMap<int, KStyle> Presets{
+                {Green, {QFont("Times", 10), QColor(Qt::green).darker(), QColor(Qt::green).darker(), Qt::white}},
+                {Orange, {QFont("Times", 10), QColor(255,165,0).darker(), QColor(255,165,0).darker(), Qt::white}},
+                {Red, {QFont("Times", 10), Qt::red, Qt::red, Qt::white}},
+                {Yellow, {QFont("Times", 10), QColor(Qt::yellow).darker(), QColor(Qt::yellow).darker(), Qt::white}},
+                {Black, {QFont("Times", 10), Qt::black, Qt::black, Qt::white}},
+                {Blue, {QFont("Times", 10), Qt::blue, Qt::blue, Qt::white}},
+                {Steel, {QFont("Times", 10), QColor(70,130,180).darker(), QColor(70,130,180).darker(), Qt::white}}
+            };
+            return Presets;
+        }
+
+        static KStyle GetStyle(int StyleEnum){
+            return GetStylePresets().value(StyleEnum);
+        }
+
         void SetText(const QString& Text){
             this->prepareGeometryChange();
             this->Text = Text;
             this->update();
             emit SizeChangedSignal();
+        }
+
+        KStyle GetStyle(){
+            return Style;
+        }
+
+        void SetStyle(const KStyle& Style){
+            this->prepareGeometryChange();
+            this->Style = Style;
+            this->update();
         }
 
         void SetText(const QMimeData* MimeData){
@@ -350,33 +392,34 @@ namespace Kim {
             View->Padding = this->Padding;
             View->Text = this->Text;
             View->PromptText = this->PromptText;
-            View->Font = this->Font;
+            View->Style = this->Style;
             return View;
         }
 
         virtual void paint(QPainter * painter, const QStyleOptionGraphicsItem * option, QWidget * widget = nullptr) override{
-            painter->setFont(Font);
-            QPen Pen(Qt::black);
+            painter->setFont(Style.Font);
+            QPen Pen;
             painter->setPen(Pen);
             QPainterPath Path;
             const QRectF& Bounding = this->TextBounding();
             Path.moveTo(Bounding.topLeft());
             Path.addRoundedRect(Bounding, 5.0, 5.0);
-            painter->fillPath(Path, QBrush(Qt::white));
+            painter->fillPath(Path, Style.BackgroundColor);
 
             QString FinalText = Text;
+            Pen.setColor(Style.TextColor);
             if(Text.isEmpty()){
                 FinalText = PromptText;
-                Pen.setColor(Qt::darkGray);
-                painter->setPen(Pen);
+                Pen.setColor(Style.TextColor.lighter());
             }
+            painter->setPen(Pen);
             QString tmp = FinalText;
             tmp.replace(QLatin1Char('\n'), QChar::LineSeparator);
-            QTextLayout layout(tmp, Font);
+            QTextLayout layout(tmp, Style.Font);
             SetupTextLayout(&layout);
             layout.draw(painter, QPointF(Bounding.x() + Padding/2.0, Bounding.y() + Padding/2.0));
 
-            Pen.setColor(Qt::black);
+            Pen.setColor(Style.BorderColor);
             if(this->isSelected()){
                 Pen.setWidth(3);
             }
@@ -415,42 +458,9 @@ namespace Kim {
                     || Char == 127;
         }
 
-        static QRectF SetupTextLayout(QTextLayout *layout)
-        {
-            layout->setCacheEnabled(true);
-            layout->beginLayout();
-            while (layout->createLine().isValid());
-            layout->endLayout();
-            qreal maxWidth = 0;
-            qreal y = 0;
-            for (int i = 0; i < layout->lineCount(); ++i) {
-                QTextLine line = layout->lineAt(i);
-                maxWidth = qMax(maxWidth, line.naturalTextWidth());
-                line.setPosition(QPointF(0, y));
-                y += line.height();
-            }
-            return QRectF(0, 0, maxWidth, y);
-        }
-
         QRectF GetTextSize() const{
-            QRectF br;
             const QString& Text = this->Text.isEmpty()? this->PromptText : this->Text;
-            if (Text.isEmpty()) {
-                br = QRectF();
-            } else {
-                QString tmp = Text;
-                tmp.replace(QLatin1Char('\n'), QChar::LineSeparator);
-                QTextLayout layout(tmp, Font);
-                br = SetupTextLayout(&layout);
-            }
-            return br;
-        }
-
-        static QRectF ComputeTextSize(const QString& Text, const QFont& Font){
-            static QGraphicsSimpleTextItem* Item = new QGraphicsSimpleTextItem;
-            Item->setText(Text);
-            Item->setFont(Font);
-            return Item->boundingRect();
+            return Kim::GetTextSize(Text, Style.Font);
         }
 
         static QStringList GetSupportedFormats(){
@@ -564,11 +574,85 @@ namespace Kim {
             SetText(MimeData);
         }
     };
+    class KTextItemPropertyView : public QWidget{
+        Q_OBJECT
+        friend class KTextItemPropertyController;
+    signals:
+        void AliasChangedSignal(const QString& Alias);
+        void FontColorChangedSignal(const QColor& FontColor);
+        void BackgroundColorChangedSignal(const QColor& BackgroundColor);
+        void BorderColorChangedSignal(const QColor& BorderColor);
+        void FontChangedSignal(const QFont& Font);
+    private:
+        QLineEdit* ItemAliasEdit = new QLineEdit;
+        KColorPicker* FontColorPicker = new KColorPicker("Font");
+        KColorPicker* BackgroundColorPicker = new KColorPicker("Background");
+        KColorPicker* BorderColorPicker = new KColorPicker("Border");
+        KFontPicker* FontPicker = new KFontPicker;
+        QComboBox* PresetCombo = new QComboBox;
+    public:
+        KTextItemPropertyView(){
+            QGridLayout* Layout = new QGridLayout;
+            Layout->addWidget(new QLabel("Alias: "), 0, 0);
+            Layout->addWidget(ItemAliasEdit, 0, 1);
+            Layout->addWidget(FontColorPicker, 1, 0, 1, 2);
+            Layout->addWidget(BackgroundColorPicker, 2, 0, 1, 2);
+            Layout->addWidget(BorderColorPicker, 3, 0, 1, 2);
+            Layout->addWidget(PresetCombo, 4, 1);
+            Layout->addWidget(new QLabel("Font: "), 5, 0);
+            Layout->addWidget(FontPicker, 5, 1);
+            this->setLayout(Layout);
+
+            PresetCombo->addItem("Black");
+            PresetCombo->addItem("Green");
+            PresetCombo->addItem("Orange");
+            PresetCombo->addItem("Red");
+            PresetCombo->addItem("Yellow");
+            PresetCombo->addItem("Blue");
+            PresetCombo->addItem("Steel");
+
+            connect(ItemAliasEdit, &QLineEdit::textChanged, this, &KTextItemPropertyView::AliasChangedSignal);
+            connect(FontColorPicker, &KColorPicker::ColorChangedSignal, this, &KTextItemPropertyView::FontColorChangedSignal);
+            connect(BackgroundColorPicker, &KColorPicker::ColorChangedSignal, this, &KTextItemPropertyView::BackgroundColorChangedSignal);
+            connect(BorderColorPicker, &KColorPicker::ColorChangedSignal, this, &KTextItemPropertyView::BorderColorChangedSignal);
+            connect(FontPicker, &KFontPicker::FontChangedSignal, this, &KTextItemPropertyView::FontChangedSignal);
+            connect(PresetCombo, &QComboBox::currentTextChanged, this, &KTextItemPropertyView::SetPreset);
+        }
+        void SetPreset(const QString& PresetName){
+            KTextItemView::KStyle Style;
+            if(PresetName == "Black"){
+                Style = KTextItemView::GetStyle(KTextItemView::Black);
+            }
+            else if(PresetName == "Green"){
+                Style = KTextItemView::GetStyle(KTextItemView::Green);
+            }
+            else if(PresetName == "Orange"){
+                Style = KTextItemView::GetStyle(KTextItemView::Orange);
+            }
+            else if(PresetName == "Red"){
+                Style = KTextItemView::GetStyle(KTextItemView::Red);
+            }
+            else if(PresetName == "Yellow"){
+                Style = KTextItemView::GetStyle(KTextItemView::Yellow);
+            }
+            else if(PresetName == "Blue"){
+                Style = KTextItemView::GetStyle(KTextItemView::Blue);
+            }
+            else if(PresetName == "Steel"){
+                Style = KTextItemView::GetStyle(KTextItemView::Steel);
+            }
+            this->FontColorPicker->SetColor(Style.TextColor);
+            this->BorderColorPicker->SetColor(Style.BorderColor);
+            this->BackgroundColorPicker->SetColor(Style.BackgroundColor);
+            this->FontPicker->SetFont(Style.Font);
+        }
+    };
+
     //////////////////////////////// Image Item ////////////////////////////////
     class KImageItemView : public KItemView{
         Q_OBJECT
     public: // type def
-        enum{Type = UserType+3};
+        enum{Type = ViewType::ImageItemType};
     signals: // signals
         void EditSignal();
     private slots:

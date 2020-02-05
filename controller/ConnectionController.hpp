@@ -28,17 +28,17 @@ namespace Kim {
             delete this;
         }
         void OnItemSizeChanged(KItemController* Controller){
-            UpdateConnectionDecoration();
+//            UpdateConnectionDecoration();
         }
         void UpdateSrcPosition(const QPointF& Position){
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
             ConnectionView->UpdateFrom(Position);
-            UpdateConnectionDecoration();
+//            UpdateConnectionDecoration();
         }
         void UpdateDstPosition(const QPointF& Position){
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
             ConnectionView->UpdateTo(Position);
-            UpdateConnectionDecoration();
+//            UpdateConnectionDecoration();
         }
         void UpdateConnectionDecoration(){
             auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
@@ -213,6 +213,7 @@ namespace Kim {
                 OldController->OutConnections.removeOne(this);
             }
             SrcItemController = ItemController;
+            GetConnectionView()->SetFromItem(SrcItemController->GetView());
             if(SrcItemController){
                 // 在没有Dst时，起始位置和结束位置相同
                 if(!DstItemController){
@@ -229,6 +230,7 @@ namespace Kim {
                 OldController->InConnections.removeOne(this);
             }
             DstItemController = ItemController;
+            GetConnectionView()->SetToItem(DstItemController->GetView());
             if(DstItemController){
                 if(Connect)
                     ConnectDstItem();

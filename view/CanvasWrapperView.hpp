@@ -9,6 +9,27 @@
 #include"ToolView/HelpView.hpp"
 namespace Kim {
     class KCanvasWrapperController;
+    class KPropertyView : public QWidget{
+    private:
+        QLabel* Holder = new QLabel("No Property");
+        QWidget* OldWidget = nullptr;
+        QVBoxLayout* Layout = new QVBoxLayout;
+    public:
+        KPropertyView(){
+            Layout->addWidget(Holder);
+            OldWidget = Holder;
+            this->setLayout(Layout);
+        }
+        void SwitchWidget(QWidget* Widget){
+            if(Widget == OldWidget)return;
+            if(OldWidget){
+                Layout->removeWidget(OldWidget);
+                OldWidget->setParent(nullptr);
+            }
+            Layout->addWidget(Widget);
+        }
+    };
+
     class KCanvasWrapperView : public QWidget{
         Q_OBJECT
         friend class KCanvasWrapperController;
@@ -27,6 +48,7 @@ namespace Kim {
         KCanvasView* CanvasView = nullptr;
         KSpecialInputView* SpecialInputView = new KSpecialInputView;
         KHelpView* HelpView = new KHelpView;
+        KPropertyView* ObjectPropertyView = new KPropertyView;
         KCanvasWrapperController* Controller = nullptr;
     protected:
         virtual void resizeEvent(QResizeEvent* Event)override{
@@ -116,6 +138,7 @@ namespace Kim {
             ToolLayout->addWidget(GroupToImageBtn);
             ToolLayout->addWidget(InsertTextBtn);
             ToolLayout->addWidget(InsertImageBtn);
+            ToolLayout->addWidget(ObjectPropertyView);
             ToolLayout->setAlignment(Qt::AlignTop);
 
             connect(SpecialInputView,

@@ -2,23 +2,50 @@
 #include"./controller/ApplicationController.hpp"
 #include<QDebug>
 #include<QtSql>
+void ColorPickerTest(){
+//    QMainWindow W;
+//    W.resize(800, 600);
+//    QWidget CW;
+//    QVBoxLayout* Layout = new QVBoxLayout;
+//    Layout->addWidget(new Kim::KColorPicker);
+//    Layout->addWidget(new Kim::KColorPicker);
+//    Layout->addWidget(new Kim::KColorPicker);
+//    Layout->addWidget(new Kim::KColorPicker);
+//    CW.setLayout(Layout);
+//    W.setCentralWidget(&CW);
+//    W.show();
+}
+
+//void FontPickerTest(){
+//    QMainWindow W;
+//    W.resize(800, 600);
+//    QWidget CW;
+//    QVBoxLayout* Layout = new QVBoxLayout;
+//    Layout->addWidget(new Kim::KFontPicker);
+//    Layout->addWidget(new Kim::KFontPicker);
+//    Layout->addWidget(new Kim::KFontPicker);
+//    Layout->addWidget(new Kim::KFontPicker);
+//    CW.setLayout(Layout);
+//    W.setCentralWidget(&CW);
+//    W.show();
+//}
+
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     Kim::KApplicationController::Startup();
     return a.exec();
 }
+//////////////////////////////// 2020/2/5 18:09 ////////////////////////////////
+// DONE:
+// 49、connection/item shape line
 
-//////////////////////////////// 2020/2/2 15:54 ////////////////////////////////
-// Done:
-// 46、保存时弹出框置顶
-// 47、文本Item double LL
-// 5、group选中的connection
 
 // TODO:
+// 53、修正删除时偶尔crash的bug
+// 52、refactor style
 // 50、右键松开时选择item类型
 // 48、修正connection的bounding rect
-// 49、connection/item shape line
 // 45、复用text edit的edit dialog
 // 43、最小化弹出的tab时不太正常
 // 42、同步文件名与canvs name：打开时、保存时
@@ -45,6 +72,16 @@ int main(int argc, char *argv[])
 // 36、选择某条路径expand
 // 37、group in out connection
 // 38、close console, redirect log to file
+
+//////////////////////////////// 2020/2/3 18:09 ////////////////////////////////
+// DONE:
+// 51、text item style
+
+//////////////////////////////// 2020/2/2 15:54 ////////////////////////////////
+// Done:
+// 46、保存时弹出框置顶
+// 47、文本Item double LL
+// 5、group选中的connection
 
 //////////////////////////////// 2020/2/1 ??:?? ////////////////////////////////
 // Done:

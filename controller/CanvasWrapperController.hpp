@@ -33,10 +33,23 @@ namespace Kim {
             if(SavedCanvasFilename.isEmpty())return;
             emit SaveSignal(CanvasController, SavedCanvasFilename);
         }
+
+        void OnCanvasFocusObjectChanged(KGraphicsObjectController* Object){
+            if(Object){
+                if(Object->type() == KTextItemView::Type){
+                    TextItemPropertyController->SetItem(static_cast<KTextItemController*>(Object));
+                    View->ObjectPropertyView->SwitchWidget(TextItemPropertyController->GetView());
+                }
+            }
+            else{
+                qDebug()<<"focus is null";
+            }
+        }
     private:
         QString SavedCanvasFilename = "";
         KCanvasController* CanvasController = new KCanvasController;
         KCanvasWrapperView* View = new KCanvasWrapperView(CanvasController->GetCanvasView());
+        KTextItemPropertyController* TextItemPropertyController = new KTextItemPropertyController;
     public:
         KCanvasWrapperController(){
             View->SetController(this);
@@ -88,6 +101,8 @@ namespace Kim {
                     [=]{
                 this->CanvasController->OnInsertItem(KImageItemView::Type);
             });
+            connect(CanvasController, &KCanvasController::FocusedObjectChangedSignal,
+                    this, &KCanvasWrapperController::OnCanvasFocusObjectChanged);
         }
         ~KCanvasWrapperController(){
             delete View;

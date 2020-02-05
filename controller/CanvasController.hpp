@@ -79,6 +79,7 @@ namespace Kim {
         void SaveSingal();
         void SaveAsSignal();
         void LoadSignal();
+        void FocusedObjectChangedSignal(KGraphicsObjectController* Item);
     public slots:
         void OnKeyPress(QKeyEvent* Event){
             // Ctrl + Alt + Key
@@ -196,6 +197,12 @@ namespace Kim {
                         return;
                     }
                     SceneContext.DragingConnectionController->SetDstItemController(ItemController);
+//                    auto SrcItem = SceneContext.DragingConnectionController->GetSrcItemController();
+//                    if(SrcItem && SrcItem->type() == ItemController->type()){
+//                        if(SrcItem->type() == KTextItemView::Type){
+//                            ItemController->GetItemView<KTextItemView>()->SetStyle(SrcItem->GetItemView<KTextItemView>()->GetStyle());
+//                        }
+//                    }
                     SceneContext.DragingConnectionController = nullptr;
                 }
             }
@@ -239,6 +246,13 @@ namespace Kim {
                 auto Pos = SceneContext.DragingConnectionController->GetConnectionView()->GetTo();
                 TextItemController->GetView()->setPos(Pos);
                 SceneContext.DragingConnectionController->SetDstItemController(TextItemController);
+                auto SrcItem = SceneContext.DragingConnectionController->GetSrcItemController();
+                auto ItemController = TextItemController;
+                if(SrcItem && SrcItem->type() == ItemController->type()){
+                    if(SrcItem->type() == KTextItemView::Type){
+                        ItemController->GetItemView<KTextItemView>()->SetStyle(SrcItem->GetItemView<KTextItemView>()->GetStyle());
+                    }
+                }
                 SceneContext.DragingConnectionController = nullptr;
             }
         }
@@ -444,6 +458,12 @@ namespace Kim {
                              this, &KCanvasController::OnSceneDragMove);
             QObject::connect(Scene, &KScene::DropSignal,
                              this, &KCanvasController::OnSceneDrop);
+            QObject::connect(Scene, &QGraphicsScene::focusItemChanged, [=](QGraphicsItem *newFocusItem, QGraphicsItem *oldFocusItem, Qt::FocusReason reason){
+                auto NewFocus = dynamic_cast<KGraphicsViewBase*>(newFocusItem);
+                if(NewFocus){
+                    emit FocusedObjectChangedSignal(NewFocus->GetController());
+                }
+            });
 
         }
 
@@ -615,6 +635,14 @@ namespace Kim {
 
         void OnDeletePress(){
             DeleteSelectedControlleres();
+            // delete connection controler point
+            const auto& Items = Scene->selectedItems();
+            for(auto Item : Items){
+                if(Item->type() == KControlPoint::Type){
+                    auto CtrlP = static_cast<KControlPoint*>(Item);
+                    emit CtrlP->DeletedSignal(CtrlP);
+                }
+            }
         }
 
         void OnSpacePress(){
