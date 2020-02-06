@@ -331,22 +331,11 @@ namespace Kim {
         }
 
         virtual QRectF boundingRect() const override{
-
-//            qreal Padding = 2.0;
-//            qreal X = std::min(From.x(), To.x());
-//            qreal Y = std::min(From.y(), To.y());
-//            qreal W = std::abs(To.x() - From.x());
-//            qreal H = std::abs(To.y() - From.y());
-//            auto Rect = QRectF(X, Y, W, H);
-//            for(auto Item: Ctrls){
-//                Extend(Rect, Item->pos());
-//            }
-//            return Rect;
             const qreal DecorPadding = 20;
             QRectF Rect{0,0,0,0};
-            const auto& Lines = CreateLines();
-            for(const auto& Line : Lines){
-                ExtendRect(Rect, Line);
+            const auto& Points = CreatePoints();
+            for(const auto& P : Points){
+                ExtendRect(Rect, P);
             }
             return PaddingOut(Rect, 3.0 + DecorPadding);
         }
@@ -496,56 +485,16 @@ namespace Kim {
                     Points.append(Item->pos());
                 }
                 Points.append(To);
-                QVector<QLineF> Lines{};
-                qreal Threshold = 3;
+                QVector<QPointF> Ps{};
+                qreal Threshold = 6;
                 for(int i = 0; i < Points.size() - 1; i++){
                     bool ShouldBreak = false;
-                    Lines.clear();
-                    CreateLines(Lines, i, Points);
-//                qreal Scale = 0.5;
-//                    if(i == 0){
-//                        auto P0 = Points[0];
-//                        auto P1 = Points[1];
-//                        auto P2 = Points[2];
-//                        auto PrevMid = (P0+P1)/2;
-//                        auto NextMid = (P1+P2)/2;
-//                        auto DMid = NextMid - PrevMid;
-//                        auto F = P0;
-//                        auto C = P1 - DMid * Scale;
-//                        auto T = P1;
-//                        CreateQuadLines(Lines, F, C, T);
-//                    }
-//                    else if(i == Points.size() -2){
-//                        auto P0 = Points[i-1];
-//                        auto P1 = Points[i];
-//                        auto P2 = Points[i+1];
-//                        auto PrevMid = (P0+P1)/2;
-//                        auto NextMid = (P1+P2)/2;
-//                        auto DMid = NextMid - PrevMid;
-//                        auto F = P1;
-//                        auto C = P1 + DMid * Scale;
-//                        auto T = P2;
-//                        CreateQuadLines(Lines, F, C, T);
-//                    }
-//                    else{
-//                        auto P0 = Points[i-1];
-//                        auto P1 = Points[i];
-//                        auto P2 = Points[i+1];
-//                        auto P3 = Points[i+2];
-//                        auto Mid0 = (P0+P1)/2;
-//                        auto Mid1 = (P1+P2)/2;
-//                        auto Mid2 = (P2+P3)/2;
-//                        auto DMid1 = Mid1 - Mid0;
-//                        auto DMid2 = Mid2 - Mid1;
-//                        auto C1 = P1 + DMid1 * Scale;
-//                        auto C2 = P2 - DMid2 * Scale;
-//                        CreateCubicLines(Lines, P1, C1, C2, P2);
-//                    }
-
+                    Ps.clear();
+                    CreatePoints(Ps, i, Points);
                     bool IsInBound = false;
 
-                    for(const auto& Line : Lines){
-                        auto Dis = PointDistanceToLine(ScenePos, Line, IsInBound);
+                    for(int j = 0; j < Ps.size() - 1; j++){
+                        auto Dis = PointDistanceToLine(ScenePos, {Ps[j], Ps[j+1]}, IsInBound);
                         if(IsInBound){
                             if(Dis < Threshold){
                                 auto NewCtrl = CreateCtrlItem(ScenePos);
@@ -577,124 +526,6 @@ namespace Kim {
             return ControlP;
         }
 
-//        QVector<QPointF> CreateDMids()const{
-//            QVector<QPointF>DMids{};
-//            auto Iter = Ctrls.begin();
-//            while(Iter != Ctrls.end()){
-//                QPointF PrevP, NextP, CurrP;
-//                CurrP = (*Iter)->pos();
-//                if(Iter == Ctrls.begin()){
-//                    PrevP = From;
-//                    if(Iter + 1 == Ctrls.end()){
-//                        NextP = To;
-//                    }
-//                    else{
-//                        NextP = (*(Iter+1))->pos();
-//                    }
-//                }
-//                else if(Iter + 1 == Ctrls.end()){
-//                    if(Iter == Ctrls.begin()){
-//                        PrevP = From;
-//                    }
-//                    else{
-//                        PrevP = (*(Iter-1))->pos();
-//                    }
-//                    NextP = To;
-//                }
-//                else{
-//                    PrevP = (*(Iter-1))->pos();
-//                    NextP = (*(Iter+1))->pos();
-//                }
-//                auto PrevMid = (PrevP + CurrP) / 2;
-//                auto NextMid = (NextP + CurrP) / 2;
-//                auto DMid = NextMid - PrevMid;
-//                DMids.append(DMid);
-//            }
-//            return DMids;
-//        }
-
-        void CreateLines(QVector<QLineF>& Lines, int i, const QVector<QPointF>& Points)const{
-            qreal Scale = 0.5;
-            if(i == 0){
-                auto P0 = Points[0];
-                auto P1 = Points[1];
-                auto P2 = Points[2];
-
-                auto V0 = P0 - P1;
-                auto V1 = P2 - P1;
-
-                auto Center = KToNormalized(V0) + KToNormalized(V1);
-                QPointF Tangent{-Center.y(), Center.x()};
-                auto V0Proj = Projection(V0, Tangent) * Scale;
-                const auto& F = P0;
-                const auto& C = P1 + V0Proj;
-                const auto& T = P1;
-
-//                auto PrevMid = (P0+P1)/2;
-//                auto NextMid = (P1+P2)/2;
-//                auto DMid = NextMid - PrevMid;
-//                auto F = P0;
-//                auto C = P1 - DMid * Scale;
-//                auto T = P1;
-
-                CreateQuadLines(Lines, F, C, T);
-            }
-            else if(i == Points.size() -2){
-                auto P0 = Points[i-1];
-                auto P1 = Points[i];
-                auto P2 = Points[i+1];
-
-                auto V0 = P0 - P1;
-                auto V1 = P2 - P1;
-                auto Center = KToNormalized(V0) + KToNormalized(V1);
-                QPointF Tangent{-Center.y(), Center.x()};
-                auto V1Proj = Projection(V1, Tangent) * Scale;
-                const auto& F = P1;
-                const auto& C = P1 + V1Proj;
-                const auto& T = P2;
-
-//                auto PrevMid = (P0+P1)/2;
-//                auto NextMid = (P1+P2)/2;
-//                auto DMid = NextMid - PrevMid;
-//                auto F = P1;
-//                auto C = P1 + DMid * Scale;
-//                auto T = P2;
-
-                CreateQuadLines(Lines, F, C, T);
-            }
-            else{
-                auto P0 = Points[i-1];
-                auto P1 = Points[i];
-                auto P2 = Points[i+1];
-                auto P3 = Points[i+2];
-
-                auto V0 = P0 - P1;
-                auto V1 = P2 - P1;
-                auto V2 = P1 - P2;
-                auto V3 = P3 - P2;
-                auto Center1 = KToNormalized(V0) + KToNormalized(V1);
-                auto Center2 = KToNormalized(V2) + KToNormalized(V3);
-                QPointF Tangent1{-Center1.y(), Center1.x()};
-                QPointF Tangent2{-Center2.y(), Center2.x()};
-                auto V1Proj = Projection(V1, Tangent1) * Scale;
-                auto V2Proj = Projection(V2, Tangent2) * Scale;
-                const auto& F = P1;
-                const auto& C1 = P1 + V1Proj;
-                const auto& C2 = P2 + V2Proj;
-                const auto& T = P2;
-
-//                auto Mid0 = (P0+P1)/2;
-//                auto Mid1 = (P1+P2)/2;
-//                auto Mid2 = (P2+P3)/2;
-//                auto DMid1 = Mid1 - Mid0;
-//                auto DMid2 = Mid2 - Mid1;
-//                auto C1 = P1 + DMid1 * Scale;
-//                auto C2 = P2 - DMid2 * Scale;
-
-                CreateCubicLines(Lines, F, C1, C2, T);
-            }
-        }
-
         void CreatePoints(QVector<QPointF>& OutputPoints, int i, const QVector<QPointF>& Points)const{
             qreal Scale = 0.5;
             if(i == 0){
@@ -712,13 +543,6 @@ namespace Kim {
                 const auto& C = P1 + V0Proj;
                 const auto& T = P1;
 
-//                auto PrevMid = (P0+P1)/2;
-//                auto NextMid = (P1+P2)/2;
-//                auto DMid = NextMid - PrevMid;
-//                auto F = P0;
-//                auto C = P1 - DMid * Scale;
-//                auto T = P1;
-
                 CreateQuadPoints(OutputPoints, F, C, T);
             }
             else if(i == Points.size() -2){
@@ -734,13 +558,6 @@ namespace Kim {
                 const auto& F = P1;
                 const auto& C = P1 + V1Proj;
                 const auto& T = P2;
-
-//                auto PrevMid = (P0+P1)/2;
-//                auto NextMid = (P1+P2)/2;
-//                auto DMid = NextMid - PrevMid;
-//                auto F = P1;
-//                auto C = P1 + DMid * Scale;
-//                auto T = P2;
 
                 CreateQuadPoints(OutputPoints, F, C, T);
             }
@@ -765,34 +582,8 @@ namespace Kim {
                 const auto& C2 = P2 + V2Proj;
                 const auto& T = P2;
 
-//                auto Mid0 = (P0+P1)/2;
-//                auto Mid1 = (P1+P2)/2;
-//                auto Mid2 = (P2+P3)/2;
-//                auto DMid1 = Mid1 - Mid0;
-//                auto DMid2 = Mid2 - Mid1;
-//                auto C1 = P1 + DMid1 * Scale;
-//                auto C2 = P2 - DMid2 * Scale;
-
                 CreateCubicPoints(OutputPoints, F, C1, C2, T);
             }
-        }
-
-        QVector<QLineF> CreateLines()const{
-            QVector<QLineF> Lines{};
-            if(Ctrls.isEmpty()){
-                Lines.append({From, To});
-            }
-            else{
-                QVector<QPointF> Points{From};
-                for(auto Item : Ctrls){
-                    Points.append(Item->pos());
-                }
-                Points.append(To);
-                for(int i = 0; i < Points.size() - 1; i++){
-                    CreateLines(Lines, i, Points);
-                }
-            }
-            return Lines;
         }
 
         QVector<QPointF> CreatePoints()const{

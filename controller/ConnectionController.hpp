@@ -176,6 +176,7 @@ namespace Kim {
         }
         virtual ~KConnectionController() override{
             emit DestroyedSignal(this);
+            delete GraphicsObject;
             if(SrcItemController){
                 SrcItemController->OutConnections.removeOne(this);
                 SrcItemController->UpdateMark();
@@ -183,11 +184,12 @@ namespace Kim {
             if(DstItemController){
                 DstItemController->InConnections.removeOne(this);
             }
-            auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
-            if(ConnectionView->scene()){
-                ConnectionView->scene()->removeItem(ConnectionView);
-            }
-            delete ConnectionView;
+            GraphicsObject = nullptr;
+            SrcItemController = DstItemController = nullptr;
+//            auto ConnectionView = static_cast<KConnectionView*>(GraphicsObject);
+//            if(ConnectionView->scene()){
+//                ConnectionView->scene()->removeItem(ConnectionView);
+//            }
         }
 
         qint64 GetIdentity(){
