@@ -23,6 +23,24 @@ namespace Kim {
             return Bool? QChar('Y') : QChar('N');
         }
 
+        QString ColorToString(const QColor& Color){
+            return QString("%1, %2, %3, %4")
+                    .arg(Color.red()).arg(Color.green())
+                    .arg(Color.blue()).arg(Color.alpha());
+        }
+
+        QString PointsToString(const QList<QPointF>& Points){
+            QString PointsString = "";
+            for(const auto& Point : Points){
+                PointsString += PointToString(Point) + ";";
+            }
+            return PointsString;
+        }
+
+        QString FontToString(const QFont& Font){
+            return Font.toString();
+        }
+
         QPointF PointFromString(const QString& Point){
             auto List = Point.split(',');
             return QPointF(List[0].trimmed().toDouble(), List[1].trimmed().toDouble());
@@ -30,6 +48,29 @@ namespace Kim {
 
         bool BoolFromString(const QString& String){
             return String == QString("Y")? true : false;
+        }
+
+        QColor ColorFromString(const QString& String){
+            auto List = String.split(',');
+            return QColor(List[0].trimmed().toInt(),
+                    List[1].trimmed().toInt(),
+                    List[2].trimmed().toInt(),
+                    List[3].trimmed().toInt());
+        }
+
+        QFont FontFromString(const QString& String){
+            QFont Font;
+            Font.fromString(String);
+            return Font;
+        }
+
+        QList<QPointF> PointsFromString(const QString& String){
+            QList<QPointF> Ret{};
+            auto List = String.split(';', QString::SplitBehavior::SkipEmptyParts);
+            for(auto P : List){
+                Ret.append(PointFromString(P));
+            }
+            return Ret;
         }
 
         QString GroupIDToString(const QVariant& GroupID){
@@ -76,6 +117,10 @@ namespace Kim {
             Result = Query.exec("CREATE TABLE 'TextItem' ("
                                 "'Identity'    INTEGER,       "
                                 "'Content'	TEXT,       "
+                                "'Font'     TEXT,"
+                                "'FontColor'    TEXT,"
+                                "'BackgroundColor'  TEXT,"
+                                "'BorderColor'      TEXT,"
                                 "PRIMARY KEY('Identity')   "
                                 ")");
             CheckResult(Result, Query);
@@ -94,6 +139,7 @@ namespace Kim {
                                 "'DstConnected' CHAR(2),     "
                                 "'GroupItemID'  INTEGER,"
                                 "'CanvasID'     INTEGER,"
+                                "'CtrlPoints'   TEXT,"
                                 "PRIMARY KEY('Identity')"
                                 ")");
             CheckResult(Result, Query);
@@ -130,6 +176,10 @@ namespace Kim {
         void InsertTextItem(KTextItemController* TextItem, QSqlQuery& Query){
             Query.bindValue(":Identity", QVariant(TextItem->Identity));
             Query.bindValue(":Content", QVariant(TextItem->GetView()->GetContent()));
+            Query.bindValue(":Font", FontToString(TextItem->GetItemView<KTextItemView>()->GetStyle().Font));
+            Query.bindValue(":FontColor", ColorToString(TextItem->GetItemView<KTextItemView>()->GetStyle().TextColor));
+            Query.bindValue(":BackgroundColor", ColorToString(TextItem->GetItemView<KTextItemView>()->GetStyle().BackgroundColor));
+            Query.bindValue(":BorderColor", ColorToString(TextItem->GetItemView<KTextItemView>()->GetStyle().BorderColor));
             bool Result = Query.exec();
             CheckResult(Result, Query);
         }
@@ -151,6 +201,7 @@ namespace Kim {
             Query.bindValue(":DstConnected", BoolToChar(Conn->IsDstConnected()));
             Query.bindValue(":GroupItemID", GroupID);
             Query.bindValue(":CanvasID", CanvasID);
+            Query.bindValue(":CtrlPoints", PointsToString(Conn->GetConnectionView()->GetCtrlPoints()));
             bool Result = Query.exec();
             CheckResult(Result, Query);
         }
@@ -160,7 +211,8 @@ namespace Kim {
             QString BaseItemPrepare = QString("INSERT INTO BaseItem VALUES (:Identity, :Alias, :CreatedAt,"
                                       ":LastModifiedAt, :Position, :FoldConnectionCount, :Collapsed,"
                                       ":ParentPosWhenCollapse, :GroupItemID, :CanvasID)");
-            QString TextItemPrepare = "INSERT INTO TextItem VALUES (:Identity, :Content)";
+            QString TextItemPrepare = "INSERT INTO TextItem VALUES (:Identity, :Content, :Font,"
+                                      ":FontColor, :BackgroundColor, :BorderColor)";
             QString ImageItemPrepare = "INSERT INTO ImageItem VALUES (:Identity, :Content)";
             Query.prepare(BaseItemPrepare);
             for(auto Item : Items){
@@ -181,7 +233,8 @@ namespace Kim {
         void InsertConnections(const QLinkedList<KConnectionController*>& Conns, QSqlQuery& Query,
                                const QVariant& CanvasID, const QVariant& GroupID = QVariant()){
             QString ConnectionPrepare = QString("INSERT INTO Connection VALUES (:Identity, :FromID, :ToID, :Collapsed, "
-                                        ":SrcConnected, :DstConnected, :GroupItemID, :CanvasID)");
+                                        ":SrcConnected, :DstConnected, :GroupItemID, :CanvasID, "
+                                                ":CtrlPoints)");
             Query.prepare(ConnectionPrepare);
             for(auto Conn : Conns){
                 InsertConnection(Conn, Query, CanvasID, GroupID);
@@ -240,10 +293,21 @@ namespace Kim {
 
         struct TextItemRecord : BaseItemRecord{
             QString Content;
+            QFont Font;
+            QColor FontColor;
+            QColor BackgroundColor;
+            QColor BorderColor;
             KTextItemController* ToController()const{
                 auto Controller = new KTextItemController;
                 SetController(Controller);
-                Controller->GetView()->SetContent(Content);
+                auto View = Controller->GetItemView<KTextItemView>();
+                View->SetContent(Content);
+                KTextItemView::KStyle Style;
+                Style.Font = Font;
+                Style.TextColor = FontColor;
+                Style.BackgroundColor = BackgroundColor;
+                Style.BorderColor = BorderColor;
+                View->SetStyle(Style);
                 return Controller;
             }
         };
@@ -267,6 +331,7 @@ namespace Kim {
             bool DstConnected;
             qint64 GroupItemID;
             qint64 CanvasID;
+            QList<QPointF> CtrlPoints;
             KConnectionController* ToController(
                     const QMap<qint64, KItemController*>& Items
                     )const{
@@ -279,6 +344,7 @@ namespace Kim {
                     Controller->SetSrcItemController(SrcItem.value(), SrcConnected);
                 if(DstItem != Items.end())
                     Controller->SetDstItemController(DstItem.value(), DstConnected);
+                Controller->GetConnectionView()->SetCtrlPoints(CtrlPoints);
                 return Controller;
             }
         };
@@ -327,6 +393,10 @@ namespace Kim {
             while(Query.next()){
                 ReadBaseInfo(Record, Query);
                 Record.Content = Query.value("Content").toString();
+                Record.Font = FontFromString(Query.value("Font").toString());
+                Record.FontColor = ColorFromString(Query.value("FontColor").toString());
+                Record.BackgroundColor = ColorFromString(Query.value("BackgroundColor").toString());
+                Record.BorderColor = ColorFromString(Query.value("BorderColor").toString());
                 Result.append(Record);
             }
         }
@@ -359,6 +429,7 @@ namespace Kim {
                 Record.DstConnected = BoolFromString(Query.value("DstConnected").toString());
                 Record.GroupItemID = Query.value("GroupItemID").toLongLong();
                 Record.CanvasID = Query.value("CanvasID").toLongLong();
+                Record.CtrlPoints = PointsFromString(Query.value("CtrlPoints").toString());
                 Result.append(Record);
             }
         }

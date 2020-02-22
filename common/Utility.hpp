@@ -62,21 +62,22 @@ namespace Kim {
         }
     }
 
-    static QPointF QuadValue(const QPointF& From, const QPointF& Ctrl, const QPointF& To, qreal T){
-        return (1-T)*(1-T)*From + 2 * (1-T) * T * Ctrl + T * T * To;
+    static QPointF QuadValue(const QPointF& P0, const QPointF& P1, const QPointF& P2, qreal T){
+        return (1-T)*(1-T)*P0 + 2*(1-T)*T*P1 + T*T*P2;
     }
 
-    static QPointF CubicValue(const QPointF& From, const QPointF& C1, const QPointF& C2, const QPointF& To, qreal T){
-        return (1-T)*(1-T)*(1-T)*From + 3 * (1-T) * (1-T) * T * C1 + 3 * (1-T) * T * T * C2 + T * T * T * To;
+    static QPointF QuadDerived(const QPointF& P0, const QPointF& P1, const QPointF& P2, qreal T){
+        return -2*(1-T)*P0 + 2*(-2*T+1)*P1 + 2*T*P2;
     }
 
-    static QPointF CubicDerived(const QPointF& From, const QPointF& C1, const QPointF& C2, const QPointF& To, qreal T){
-        return -3*(1-T)*(1-T)*From + 3*(-2*(1-T)*T+(1-T)*(1-T))* C1 + 3*(-T*T+(1-T)*2*T)*C2 + 3*T*T*To;
+    static QPointF CubicValue(const QPointF& P0, const QPointF& P1, const QPointF& P2, const QPointF& P3, qreal T){
+        return (1-T)*(1-T)*(1-T)*P0 + 3*(1-T)*(1-T)*T*P1 + 3*(1-T)*T*T*P2 + T*T*T*P3;
     }
 
-    static QPointF QuadDerived(const QPointF& From, const QPointF& C1, const QPointF& To, qreal T){
-        return -2*(1-T)*From + 2*(-2*T+1)*C1 + 2*T*To;
+    static QPointF CubicDerived(const QPointF& P0, const QPointF& P1, const QPointF& P2, const QPointF& P3, qreal T){
+        return -3*(1-T)*(1-T)*P0 + 3*(-2*(1-T)*T+(1-T)*(1-T))*P1 + 3*(-T*T+(1-T)*2*T)*P2 + 3*T*T*P3;
     }
+
 
     static qreal DegreeBetween(const QPointF& V0, const QPointF& V1){
         auto V2 = Projection(V0, V1);
@@ -163,27 +164,17 @@ namespace Kim {
         auto V0 = P0 - Point;
         auto Deg0 = DegreeBetween(V0, Derived);
         if(Deg0 > Threshold){
-//            qDebug()<<"left"<<Deg0<<Threshold<<(T+FromT)/2<<FromT<<T<<ToT;
-//            qDebug()<<V0<<Derived;
             CreateCubicPoints(Points, Iter, From, C1, C2, To, (T+FromT)/2, FromT, T);
         }
         auto P1 = *(Iter+1);
         auto V1 = P1 - Point;
         auto Deg1 = DegreeBetween(V1, Derived);
         if(Deg1 > Threshold){
-//            qDebug()<<"right"<<Deg1<<Threshold<<(T+ToT)/2<<FromT<<T<<ToT;
             CreateCubicPoints(Points, Iter+1, From, C1, C2, To, (T+ToT)/2, T, ToT);
         }
     }
 
     static void CreateCubicPoints(QVector<QPointF>& Points, const QPointF& From, const QPointF& C1, const QPointF& C2, const QPointF& To){
-//       int Sample = 16;
-//       qreal Delta = 1.0 / Sample;
-//        for(int i = 0; i <= Sample; i++){
-//            qreal CurrentT = Delta * i;
-//            auto P0 = CubicValue(From, C1, C2, To, CurrentT);
-//            Points.append(P0);
-//        }
         QLinkedList<QPointF>TmpPoints{From, To};
         CreateCubicPoints(TmpPoints, TmpPoints.begin() + 1, From, C1, C2, To, 0.5, 0, 1);
         for(const auto& P : TmpPoints){

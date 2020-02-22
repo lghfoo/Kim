@@ -475,7 +475,7 @@ namespace Kim {
             if(Ctrls.isEmpty()){
                 if(InRange(ScenePos.x(), From.x(), To.x())
                         && InRange(ScenePos.y(), From.y(), To.y())){
-                    ToClosestPoint(ScenePos, From, To);
+//                    ToClosestPoint(ScenePos, From, To);
                     Ctrls.append(CreateCtrlItem(ScenePos));
                 }
             }
@@ -602,6 +602,20 @@ namespace Kim {
                 }
             }
             return OutputPoints;
+        }
+
+        QList<QPointF> GetCtrlPoints(){
+            QList<QPointF>Ret{};
+            for(auto Ctrl : Ctrls){
+                Ret.append(Ctrl->pos());
+            }
+            return Ret;
+        }
+
+        void SetCtrlPoints(const QList<QPointF>& Points){
+            for(const auto& Point : Points){
+                Ctrls.append(CreateCtrlItem(Point));
+            }
         }
     };
 }
