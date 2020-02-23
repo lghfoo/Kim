@@ -17,8 +17,16 @@ namespace Kim {
         ConnectionType = UserType + 1,
         ControlPointType = UserType + 2,
         TextItemType = UserType + 3,
-        ImageItemType = UserType + 4
-                 };
+        ImageItemType = UserType + 4,
+        GroupPanItemType = UserType + 5
+    };
+    enum ZOrder{
+        CursorZ = 1,
+        NormalItemZ = 0,
+        ConnectionZ = -1,
+        PanItemZ = -2
+    };
+
     static const QString IdentityTimeFormat = "yyyy_MM_dd_hh_mm_ss_zzz";
     static const QString NormalTimeFormat = "yyyy/MM/dd hh:mm:ss";
     enum SelectionType{
@@ -113,27 +121,17 @@ namespace Kim {
         auto V0 = P0 - Point;
         auto Deg0 = DegreeBetween(V0, Derived);
         if(Deg0 > Threshold){
-//            qDebug()<<"left"<<Deg0<<Threshold<<(T+FromT)/2<<FromT<<T<<ToT;
-//            qDebug()<<V0<<Derived;
             CreateQuadPoints(Points, Iter, From, C1, To, (T+FromT)/2, FromT, T);
         }
         auto P1 = *(Iter+1);
         auto V1 = P1 - Point;
         auto Deg1 = DegreeBetween(V1, Derived);
         if(Deg1 > Threshold){
-//            qDebug()<<"right"<<Deg1<<Threshold<<(T+ToT)/2<<FromT<<T<<ToT;
             CreateQuadPoints(Points, Iter+1, From, C1, To, (T+ToT)/2, T, ToT);
         }
     }
 
     static void CreateQuadPoints(QVector<QPointF>& Points, const QPointF& From, const QPointF& Ctrl, const QPointF& To){
-//       int Sample = 16;
-//       qreal Delta = 1.0 / Sample;
-//        for(int i = 0; i <= Sample; i++){
-//            qreal CurrentT = Delta * i;
-//            auto P0 = QuadValue(From, Ctrl, To, CurrentT);
-//            Points.append(P0);
-//        }
         QLinkedList<QPointF>TmpPoints{From, To};
         CreateQuadPoints(TmpPoints, TmpPoints.begin() + 1, From, Ctrl, To, 0.5, 0, 1);
         for(const auto& P : TmpPoints){

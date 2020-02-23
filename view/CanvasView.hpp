@@ -8,6 +8,7 @@
 #include<QGraphicsSceneDragDropEvent>
 #include<QFileDialog>
 #include <QScrollBar>
+#include "../common/Utility.hpp"
 namespace Kim {
     class KScene : public QGraphicsScene{
         Q_OBJECT
@@ -72,7 +73,7 @@ namespace Kim {
         bool ShowingCursor = true;
     public:
         KScene(){
-            Cursor->setZValue(1);
+            Cursor->setZValue(ZOrder::CursorZ);
             this->addItem(Cursor);
         }
 

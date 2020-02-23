@@ -1,7 +1,6 @@
 ﻿#pragma once
 #include"ItemController.hpp"
 #include"ConnectionController.hpp"
-
 #include <QLinkedList>
 namespace Kim {
     class KItemGroupController : public QObject{
@@ -45,6 +44,7 @@ namespace Kim {
             }
         }
     private:
+        KGroupPanItemView* PanItem = new KGroupPanItemView;
         QPointF PosWhenGrouping = {};
         KItemController* GroupItem = nullptr;
         QLinkedList<KItemController*>Items = {};
@@ -62,6 +62,21 @@ namespace Kim {
 
         void AddItem(KItemController* Item){
             Items.append(Item);
+        }
+
+        void UpdatePanBounding(){
+            PanItem->SetBounding({});
+            for(auto Item : Items){
+                auto ItemBounding = PanItem->mapFromItem(Item->GetView(), Item->GetView()->boundingRect()).boundingRect();
+                if(Item == Items.front()){
+                    PanItem->SetBounding(ItemBounding);
+                }
+                else{
+                    auto Rect = PanItem->GetBounding();
+                    ExtendRect(Rect, ItemBounding);
+                    PanItem->SetBounding(Rect);
+                }
+            }
         }
 
         void AddConnection(KConnectionController* Conn){
@@ -120,6 +135,9 @@ namespace Kim {
             return this->GroupItem;
         }
 
+        KGroupPanItemView* GetPanItem(){
+            return PanItem;
+        }
         // use when ungroup
         void Clear(){
             this->Items.clear();

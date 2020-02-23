@@ -221,7 +221,7 @@ namespace Kim {
         }
 
         KConnectionView(){
-            this->setZValue(-1);
+            this->setZValue(ConnectionZ);
         }
 
         virtual ~KConnectionView() override{

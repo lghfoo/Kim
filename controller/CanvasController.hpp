@@ -197,12 +197,6 @@ namespace Kim {
                         return;
                     }
                     SceneContext.DragingConnectionController->SetDstItemController(ItemController);
-//                    auto SrcItem = SceneContext.DragingConnectionController->GetSrcItemController();
-//                    if(SrcItem && SrcItem->type() == ItemController->type()){
-//                        if(SrcItem->type() == KTextItemView::Type){
-//                            ItemController->GetItemView<KTextItemView>()->SetStyle(SrcItem->GetItemView<KTextItemView>()->GetStyle());
-//                        }
-//                    }
                     SceneContext.DragingConnectionController = nullptr;
                 }
             }
@@ -335,9 +329,9 @@ namespace Kim {
         }
 
         void OnItemUngroup(KItemController* Controller){
-            GroupControlleres.remove(Controller->GetIdentity());
             auto ItemGroup = Controller->GetItemGroupController();
             if(ItemGroup){
+                // process group
                 const auto& PosWhenGrouping = ItemGroup->GetPosWhenGrouping();
                 const auto& CurrentPos = Controller->GetView()->pos();
                 const auto& DPos = CurrentPos - PosWhenGrouping;
@@ -346,7 +340,9 @@ namespace Kim {
                 const auto& InConnections = ItemGroup->GetInConnections();
                 const auto& OutConnections = ItemGroup->GetOutConnections();
                 for(auto Item : Items){
-                    Item->GetView()->moveBy(DPos.x(), DPos.y());
+                    if(!Item->IsCollapsed()){
+                        Item->GetView()->moveBy(DPos.x(), DPos.y());
+                    }
                     auto Pos = Item->GetView()->pos();
                     this->AddItem(Item, &Pos);
                 }
@@ -354,17 +350,111 @@ namespace Kim {
                     this->AddConnectionController(Conn);
                 }
                 for(auto InConn : InConnections){
-//                    InConn->GetSrcItemController()->AddOutConnection(InConn);
                     InConn->ConnectSrcItem();
                     this->AddConnectionController(InConn);
                 }
                 for(auto OutConn : OutConnections){
-//                    OutConn->GetDstItemController()->AddInConnection(OutConn);
                     OutConn->ConnectDstItem();
                     this->AddConnectionController(OutConn);
                 }
                 ItemGroup->Clear();
-                delete Controller;
+
+                // process group item
+                Controller->SetIsGroupping(false);
+                while(!Controller->GetConnections().isEmpty()){
+                    DeleteConnection(Controller->GetConnections().back());
+                }
+                auto PanItem = ItemGroup->GetPanItem();
+                PanItem->moveBy(DPos.x(), DPos.y());
+                AddItemAt(PanItem, PanItem->pos());
+                const auto& PanBounding = PanItem->mapToScene(PanItem->boundingRect()).boundingRect();
+                const auto& ItemBounding = Controller->GetView()->boundingRect();
+                qreal PosX = PanBounding.center().x();
+                qreal VGap = 5.0;
+                qreal PosY = PanBounding.top() - VGap - ItemBounding.height() / 2.0;
+                Controller->SetPos({PosX, PosY});
+            }
+        }
+
+        void OnItemGroup(KItemController* Controller){
+            auto ItemGroup = Controller->GetItemGroupController();
+            if(ItemGroup && !Controller->IsGroupping()){
+                Controller->SetIsGroupping(true);
+                auto PanItem = ItemGroup->GetPanItem();
+                const auto& PanBounding = PanItem->mapToScene(PanItem->boundingRect()).boundingRect();
+                const auto& ItemsInPan = Scene->items(PanBounding);
+                QSet<KItemController*>TargetItems{};
+                bool Collapsed = true;
+                for(auto Item : ItemsInPan){
+                    switch (Item->type()) {
+                    case KTextItemView::Type:
+                    case KImageItemView::Type:
+                    {
+                        auto ItemView = static_cast<KItemView*>(Item);
+                        auto ItemController = static_cast<KItemController*>(ItemView->GetController());
+                        TargetItems.insert(ItemController);
+                        GetAllChildren(ItemController, TargetItems, &Collapsed);
+                        break;
+                    }
+                    default:
+                        break;
+                    }
+
+                }
+
+                QSet<KConnectionController*>Visited{};
+                for(auto ItemController : TargetItems){
+                    if(ItemController == Controller)break;
+                    this->RemoveItem(ItemController);
+                    ItemGroup->AddItem(ItemController);
+                    const auto& Conns = ItemController->GetConnections();
+                    for(auto Conn : Conns){
+                        if(Visited.contains(Conn))continue;
+                        Visited.insert(Conn);
+                        this->RemoveConnection(Conn);
+                        auto SrcItem = Conn->GetSrcItemController();
+                        auto DstItem = Conn->GetDstItemController();
+                        bool SrcContained = TargetItems.contains(SrcItem);
+                        bool DstContained = TargetItems.contains(DstItem);
+                        if(SrcContained && DstContained){
+                            ItemGroup->AddConnection(Conn);
+                        }
+                        else if(SrcContained){
+                            // !DstSelected
+                            ItemGroup->AddOutConnection(Conn);
+                            // 切断外界与group内部的连接
+                            Conn->DisconnectDstItem();
+                        }
+                        else if(DstContained){
+                            // !SrcSelected
+                            ItemGroup->AddInConnection(Conn);
+                            // 切断外界与group内部的连接
+                            Conn->DisconnectSrcItem();
+                        }
+                        else{
+                            // will not happen
+                        }
+                    }
+
+                }
+                const auto& SrcItems = ItemGroup->GetSrcItems();
+                for(auto SrcItem : SrcItems){
+                    auto Conn = CreateAndAddConnectionController();
+                    Conn->SetSrcItemController(SrcItem);
+                    Conn->SetDstItemController(Controller);
+                    connect(Conn, &KConnectionController::DestroyedSignal,
+                            ItemGroup, &KItemGroupController::OnInConnectionDestroyed);
+                }
+                const auto& DstItems = ItemGroup->GetDstItems();
+                for(auto DstItem : DstItems){
+                    auto Conn = CreateAndAddConnectionController();
+                    Conn->SetSrcItemController(Controller);
+                    Conn->SetDstItemController(DstItem);
+                    connect(Conn, &KConnectionController::DestroyedSignal,
+                            ItemGroup, &KItemGroupController::OnOutConnectionDestroyed);
+                }
+                ItemGroup->SetPosWhenGroupping(Controller->GetView()->pos());
+                this->Scene->removeItem(PanItem);
             }
         }
         // group外的item和connection与group内的所有item和connection有引用
@@ -375,47 +465,54 @@ namespace Kim {
             int Cnt = 0;
             QSet<KConnectionController*>Visited{};
             KItemGroupController* ItemGroup = new KItemGroupController;
-            for(auto Controller : this->SelectedControlleres){
+            auto Selectedes = this->SelectedControlleres;
+            QSet<KItemController*>CollapsedChildren{};
+            bool Collapsed = true;
+            for(auto Controller : Selectedes){
                 // 只处理item，忽略connection
                 // item的所有connection都要被group
                 if(Controller->type() != KConnectionView::Type){
-                    auto Item = static_cast<KItemController*>(Controller);
-                    this->RemoveItem(Item);
-                    ItemGroup->AddItem(Item);
-                    ++Cnt;
-                    const auto& Conns = Item->GetConnections();
-                    for(auto Conn : Conns){
-                        if(Visited.contains(Conn))continue;
-                        Visited.insert(Conn);
-                        this->RemoveConnection(Conn);
-                        auto SrcItem = Conn->GetSrcItemController();
-                        auto DstItem = Conn->GetDstItemController();
-                        bool SrcSelected = SrcItem->IsSelected();
-                        bool DstSelected = DstItem->IsSelected();
-                        if(SrcSelected && DstSelected){
-                            ItemGroup->AddConnection(Conn);
-                        }
-                        else if(SrcSelected){
-                            // !DstSelected
-                            ItemGroup->AddOutConnection(Conn);
-                            // 切断外界与group内部的连接
-                            Conn->DisconnectDstItem();
-//                            DstItem->RemoveInConnection(Conn);
-                        }
-                        else if(DstSelected){
-                            // !SrcSelected
-                            ItemGroup->AddInConnection(Conn);
-                            // 切断外界与group内部的连接
-                            Conn->DisconnectSrcItem();
-//                            SrcItem->RemoveOutConnection(Conn);
-                        }
-                        else{
-                            // will not happen
-                        }
+                    auto ItemController = static_cast<KItemController*>(Controller);
+                    CollapsedChildren.clear();
+                    CollapsedChildren.insert(ItemController);
+                    GetAllChildren(ItemController, CollapsedChildren, &Collapsed);
+                    for(auto Item : CollapsedChildren){
+                        this->RemoveItem(Item);
+                        ItemGroup->AddItem(Item);
                         ++Cnt;
-                        GroupPos += Controller->GetGraphicsObject()->pos() + Conn->GetConnectionView()->boundingRect().center();
+                        const auto& Conns = Item->GetConnections();
+                        for(auto Conn : Conns){
+                            if(Visited.contains(Conn))continue;
+                            Visited.insert(Conn);
+                            this->RemoveConnection(Conn);
+                            auto SrcItem = Conn->GetSrcItemController();
+                            auto DstItem = Conn->GetDstItemController();
+                            bool SrcSelected = SrcItem->IsSelected() || CollapsedChildren.contains(SrcItem);
+                            bool DstSelected = DstItem->IsSelected() || CollapsedChildren.contains(DstItem);
+                            if(SrcSelected && DstSelected){
+                                ItemGroup->AddConnection(Conn);
+                            }
+                            else if(SrcSelected){
+                                // !DstSelected
+                                ItemGroup->AddOutConnection(Conn);
+                                // 切断外界与group内部的连接
+                                Conn->DisconnectDstItem();
+    //                            DstItem->RemoveInConnection(Conn);
+                            }
+                            else if(DstSelected){
+                                // !SrcSelected
+                                ItemGroup->AddInConnection(Conn);
+                                // 切断外界与group内部的连接
+                                Conn->DisconnectSrcItem();
+    //                            SrcItem->RemoveOutConnection(Conn);
+                            }
+                            else{
+                                // will not happen
+                            }
+                            ++Cnt;
+                            GroupPos += Controller->GetGraphicsObject()->pos() + Conn->GetConnectionView()->boundingRect().center();
+                        }
                     }
-
                 }
             }
             if(Cnt == 0){
@@ -428,9 +525,10 @@ namespace Kim {
             ItemGroup->SetGroupItem(GroupItem);
             GroupControlleres.insert(GroupItem->GetIdentity(), ItemGroup);
             connect(GroupItem, &KItemController::DestroyedSignal, ItemGroup, &KItemGroupController::Destory);
-            // signal is disconnect when remove, so clear selected manually
-            // although AddItem will clear selection
-            this->SelectedControlleres.clear();
+            GroupItem->SetIsGroupping(true);
+///             signal is disconnect when remove, so clear selected manually
+///             although AddItem will clear selection
+//            this->SelectedControlleres.clear();
             this->AddItem(GroupItem, &GroupPos);
             ItemGroup->SetPosWhenGroupping(GroupPos);
             const auto& SrcItems = ItemGroup->GetSrcItems();
@@ -449,6 +547,7 @@ namespace Kim {
                 connect(Conn, &KConnectionController::DestroyedSignal,
                         ItemGroup, &KItemGroupController::OnOutConnectionDestroyed);
             }
+            ItemGroup->UpdatePanBounding();
         }
     public:
         KCanvasController(){
@@ -508,17 +607,20 @@ namespace Kim {
         }
 
         // Children should be empty
-        void GetAllChildren(KItemController* ItemController, QSet<KItemController*>& Children){
+        void GetAllChildren(KItemController* ItemController, QSet<KItemController*>& Children, bool* Collapsed = nullptr){
             const auto& Conns = ItemController->GetOutConnections();
             for(auto Conn : Conns){
-                GetAllChildren(Conn, Children);
+                GetAllChildren(Conn, Children, Collapsed);
             }
         }
 
         // Children should be empty
-        void GetAllChildren(KConnectionController* ConnController, QSet<KItemController*>& Children){
+        void GetAllChildren(KConnectionController* ConnController, QSet<KItemController*>& Children, bool* Collapsed = nullptr){
             auto DstItem = ConnController->GetDstItemController();
             if(!Children.contains(DstItem)){
+                if(Collapsed && (*Collapsed)!=DstItem->IsCollapsed()){
+                    return;
+                }
                 Children.insert(DstItem);
                 GetAllChildren(DstItem, Children);
             }
@@ -800,6 +902,8 @@ namespace Kim {
                     this, &KCanvasController::OnItemDelete);
             connect(Controller, &KItemController::UngroupSignal,
                     this, &KCanvasController::OnItemUngroup);
+            connect(Controller, &KItemController::GroupSignal,
+                    this, &KCanvasController::OnItemGroup);
             connect(Controller, &KItemController::GroupToNewCanvasSignal,
                     this, &KCanvasController::OnItemGroupToCanvas);
 
@@ -926,6 +1030,7 @@ namespace Kim {
 
         // remove item, keep connections of item, keep selected
         void RemoveItem(KItemController* Controller){
+            SelectedControlleres.removeOne(Controller);
             DisconnectItemConntroller(Controller);
             Scene->removeItem(Controller->GetView());
             ItemControlleres.removeOne(Controller);
@@ -933,6 +1038,7 @@ namespace Kim {
 
         // remove connection, keep connections of item, keep selected
         void RemoveConnection(KConnectionController* Controller){
+            SelectedControlleres.removeOne(Controller);
             DisconnectConnectionController(Controller);
             Scene->removeItem(Controller->GetConnectionView());
             ConnectionControlleres.removeOne(Controller);

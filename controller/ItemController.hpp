@@ -23,8 +23,10 @@ namespace Kim {
         KItemMark* ExpandMark = nullptr;
         KItemMark* CollapseMark = nullptr;
         KItemMark* UngroupMark = nullptr;
+        KItemMark* GroupMark = nullptr;
         KItemMark* GroupToNewCanvasMark = nullptr;
         KItemGroupController* ItemGroupController = nullptr;
+        bool Groupping = false;
         QLinkedList<KConnectionController*>OutConnections = {};
         QLinkedList<KConnectionController*>InConnections = {};
     protected:
@@ -46,6 +48,7 @@ namespace Kim {
         void RequestCollapseSignal(KItemController* Controller);
         void RequestSelectAllChildrenSignal(KItemController* Controller, SelectionType);
         void UngroupSignal(KItemController* Controller);
+        void GroupSignal(KItemController* Controller);
         void GroupToNewCanvasSignal(KItemController* Controller);
         void DestroyedSignal(KItemController* Controller);
     public slots:
@@ -76,10 +79,14 @@ namespace Kim {
         void EmitUngroupSignal(){
             emit UngroupSignal(this);
         }
+        void EmitGroupSignal(){
+            emit GroupSignal(this);
+        }
         void EmitGroupToNewCanvasSignal(){
             emit GroupToNewCanvasSignal(this);
         }
         void UpdateMark(){
+            qreal VGap = 2.0;
             //////////////////////////////// Expand & Collapse ////////////////////////////////
             {
                 // add expand mark
@@ -121,7 +128,6 @@ namespace Kim {
                     qreal MaxW = qMax(ExpandMarkBouding.width(), CollapseMarkBouding.width());
                     qreal MaxH = qMax(ExpandMarkBouding.height(), CollapseMarkBouding.height());
                     const qreal HGap = 5.0;
-                    const qreal VGap = 5.0;
                     const qreal PosYUp = ItemBouding.center().y() - VGap - MaxH / 2.0;
                     const qreal PosYDown = ItemBouding.center().y() + VGap + MaxH / 2.0;
                     const qreal PosX = ItemBouding.left() - HGap - MaxW / 2.0;
@@ -150,11 +156,11 @@ namespace Kim {
             //////////////////////////////// Group & Ungroup ////////////////////////////////
             {
                 // add group mark
-                if(this->ItemGroupController && !UngroupMark){
+                if(this->ItemGroupController && this->IsGroupping() && !UngroupMark){
                     UngroupMark = new KItemMark(KItemMark::Plus);
                     GroupToNewCanvasMark = new KItemMark(KItemMark::Ellipse);
-                    UngroupMark->SetRadius(16);
-                    GroupToNewCanvasMark->SetRadius(16);
+//                    UngroupMark->SetRadius(16);
+//                    GroupToNewCanvasMark->SetRadius(16);
                     UngroupMark->setParentItem(GraphicsObject);
                     GroupToNewCanvasMark->setParentItem(GraphicsObject);
                     connect(UngroupMark,
@@ -167,39 +173,48 @@ namespace Kim {
                             &KItemController::EmitGroupToNewCanvasSignal);
                 }
                 // remove group mark
-                else if(!this->ItemGroupController && UngroupMark){
+                else if((!this->ItemGroupController || !this->IsGroupping()) && UngroupMark){
                     delete UngroupMark;
-                    delete GroupToNewCanvasMark;
+//                    delete GroupToNewCanvasMark;
                     UngroupMark = nullptr;
-                    GroupToNewCanvasMark = nullptr;
+//                    GroupToNewCanvasMark = nullptr;
+                    if(this->ItemGroupController && !this->IsGroupping() && !GroupMark){
+                        GroupMark = new KItemMark(KItemMark::Minus);
+//                        GroupMark->SetRadius(16);
+                        GroupMark->setParentItem(GraphicsObject);
+                        connect(GroupMark,
+                                &KItemMark::ClickedSignal,
+                                this,
+                                &KItemController::EmitGroupSignal);
+                    }
                 }
 
                 // update layout
-                if(UngroupMark && GroupToNewCanvasMark){
-
+                if((UngroupMark||GroupMark) && GroupToNewCanvasMark){
+                    KItemMark* TargetMark = UngroupMark;
+                    if(!TargetMark)TargetMark = GroupMark;
                     const auto& ItemBouding = GraphicsObject->boundingRect();
-                    const auto& UngroupMarkBouding = UngroupMark->boundingRect();
+                    const auto& TargetMarkBouding = TargetMark->boundingRect();
                     const auto& GroupToNewCanvasMarkBouding = GroupToNewCanvasMark->boundingRect();
-                    qreal MaxW = qMax(UngroupMarkBouding.width(), GroupToNewCanvasMarkBouding.width());
-                    qreal MaxH = qMax(UngroupMarkBouding.height(), GroupToNewCanvasMarkBouding.height());
+                    qreal MaxW = qMax(TargetMarkBouding.width(), GroupToNewCanvasMarkBouding.width());
+                    qreal MaxH = qMax(TargetMarkBouding.height(), GroupToNewCanvasMarkBouding.height());
                     const qreal HGap = 5.0;
-                    const qreal VGap = 5.0;
                     const qreal PosYUp = ItemBouding.center().y() - VGap - MaxH / 2.0;
                     const qreal PosYDown = ItemBouding.center().y() + VGap + MaxH / 2.0;
                     const qreal PosX = ItemBouding.right() + HGap + MaxW / 2.0;
-                    UngroupMark->setPos(PosX, PosYUp);
+                    TargetMark->setPos(PosX, PosYUp);
                     GroupToNewCanvasMark->setPos(PosX, PosYDown);
 
 //                    const auto& ItemBouding = GraphicsObject->boundingRect();
-//                    const auto& UngroupMarkBouding = UngroupMark->boundingRect();
+//                    const auto& TargetMarkBouding = TargetMark->boundingRect();
 //                    const auto& GroupToNewCanvasMarkBouding = GroupToNewCanvasMark->boundingRect();
-//                    const qreal UngroupW = UngroupMarkBouding.width();
+//                    const qreal UngroupW = TargetMarkBouding.width();
 //                    const qreal GroupToCanvasW = GroupToNewCanvasMarkBouding.width();
 //                    const qreal HGap = 5.0;
 //                    const qreal PosY = ItemBouding.center().y();
 //                    const qreal UngroupPosX = ItemBouding.right() + HGap + UngroupW / 2.0;
 //                    const qreal GroupToNewCanvasPosX = UngroupPosX  + UngroupW / 2.0 + HGap + GroupToCanvasW / 2.0;;
-//                    UngroupMark->setPos(UngroupPosX, PosY);
+//                    TargetMark->setPos(UngroupPosX, PosY);
 //                    GroupToNewCanvasMark->setPos(GroupToNewCanvasPosX, PosY);
                 }
                 else{
@@ -209,6 +224,9 @@ namespace Kim {
                     }
                     else if(GroupToNewCanvasMark){
                         TargetMark = GroupToNewCanvasMark;
+                    }
+                    else if(GroupMark){
+                        TargetMark = GroupMark;
                     }
                     if(TargetMark){
                         const auto& ItemBouding = GraphicsObject->boundingRect();
@@ -286,6 +304,15 @@ namespace Kim {
         void SetItemGroupController(KItemGroupController* Controller){
             this->ItemGroupController = Controller;
             UpdateMark();
+        }
+
+        void SetIsGroupping(bool InGroupping){
+            this->Groupping = InGroupping;
+            this->UpdateMark();
+        }
+
+        bool IsGroupping() const {
+            return this->Groupping;
         }
 
         KItemGroupController* GetItemGroupController(){

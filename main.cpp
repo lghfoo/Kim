@@ -2,46 +2,19 @@
 #include"./controller/ApplicationController.hpp"
 #include<QDebug>
 #include<QtSql>
-void ColorPickerTest(){
-//    QMainWindow W;
-//    W.resize(800, 600);
-//    QWidget CW;
-//    QVBoxLayout* Layout = new QVBoxLayout;
-//    Layout->addWidget(new Kim::KColorPicker);
-//    Layout->addWidget(new Kim::KColorPicker);
-//    Layout->addWidget(new Kim::KColorPicker);
-//    Layout->addWidget(new Kim::KColorPicker);
-//    CW.setLayout(Layout);
-//    W.setCentralWidget(&CW);
-//    W.show();
-}
-
-//void FontPickerTest(){
-//    QMainWindow W;
-//    W.resize(800, 600);
-//    QWidget CW;
-//    QVBoxLayout* Layout = new QVBoxLayout;
-//    Layout->addWidget(new Kim::KFontPicker);
-//    Layout->addWidget(new Kim::KFontPicker);
-//    Layout->addWidget(new Kim::KFontPicker);
-//    Layout->addWidget(new Kim::KFontPicker);
-//    CW.setLayout(Layout);
-//    W.setCentralWidget(&CW);
-//    W.show();
-//}
-
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     Kim::KApplicationController::Startup();
     return a.exec();
 }
-//////////////////////////////// 2020/2/5 18:09 ////////////////////////////////
-// DONE:
-// 49、connection/item shape line
-
+//////////////////////////////// 2020/2/23 16:54 ////////////////////////////////
+// Done:
+// 54、update group
 
 // TODO:
+// 55、group-collapse-ungroup bug;
+// 56、group-group bug;
 // 53、修正删除时偶尔crash的bug
 // 52、refactor style
 // 50、右键松开时选择item类型
@@ -72,6 +45,10 @@ int main(int argc, char *argv[])
 // 36、选择某条路径expand
 // 37、group in out connection
 // 38、close console, redirect log to file
+
+//////////////////////////////// 2020/2/5 18:09 ////////////////////////////////
+// DONE:
+// 49、connection/item shape line
 
 //////////////////////////////// 2020/2/3 18:09 ////////////////////////////////
 // DONE:

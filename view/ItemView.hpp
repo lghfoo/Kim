@@ -34,7 +34,7 @@ namespace Kim {
     signals:
         void ClickedSignal();
     private:
-        qreal Radius = 10.0;
+        qreal Radius = 7.0;
         qreal ShapeRadius = Radius * 0.4;
         KMarkShpae MarkShape = Plus;
     protected:
@@ -647,7 +647,6 @@ namespace Kim {
             this->FontPicker->SetFont(Style.Font);
         }
     };
-
     //////////////////////////////// Image Item ////////////////////////////////
     class KImageItemView : public KItemView{
         Q_OBJECT
@@ -857,6 +856,46 @@ namespace Kim {
                 }
             }
             event->setAccepted(false);
+        }
+    };
+    //////////////////////////////// Group Pan Item ////////////////////////////////
+    class KGroupPanItemView : public KItemView{
+    public:
+        enum {Type = ViewType::GroupPanItemType};
+    private:
+        QRectF Bounding = {0, 0, 0, 0};
+        qreal Padding = 5;
+    public:
+        KGroupPanItemView(){
+            this->setZValue(PanItemZ);
+        }
+
+        virtual QString GetTypeAsString() const override{
+            return "GroupPanItem";
+        }
+
+        virtual int type() const override{
+            return Type;
+        }
+
+        void SetBounding(const QRectF& InBounding){
+            this->Bounding = InBounding;
+        }
+
+        QRectF GetBounding()const{
+            return Bounding;
+        }
+
+        QRectF boundingRect()const override{
+            return PaddingOut(Bounding, Padding + 5);
+        }
+
+        virtual void paint(QPainter* Painter, const QStyleOptionGraphicsItem* Option, QWidget* Parent=nullptr) override{
+            QPainterPath Path;
+            auto PaddedBounding = PaddingOut(Bounding, Padding);
+            Path.addRoundedRect(PaddedBounding, 8, 8);
+            Painter->fillPath(Path, Qt::white);
+            Painter->drawRoundedRect(PaddedBounding, 8, 8);
         }
     };
 }
